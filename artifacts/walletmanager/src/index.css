@@ -1,0 +1,200 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 217 91% 30%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 215 20% 95%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 215 20% 95%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 210 100% 96%;
+    --accent-foreground: 217 91% 30%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 217 91% 30%;
+
+    --radius: 0.5rem;
+
+    --success: 158 64% 40%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --receivable: 158 64% 40%;
+    --receivable-foreground: 0 0% 100%;
+
+    --payable: 0 84% 60%;
+    --payable-foreground: 0 0% 100%;
+
+    --incoming: 158 64% 40%;
+    --outgoing: 25 95% 53%;
+
+    --sidebar-background: 222 47% 11%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 32% 20%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 32% 20%;
+    --sidebar-ring: 217 91% 60%;
+
+    --table-header: 215 20% 95%;
+    --table-row-alt: 210 20% 99%;
+  }
+
+  .dark {
+    --background: 222 47% 6%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 8%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 8%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 6%;
+
+    --secondary: 217 32% 17%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 32% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 217 32% 17%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 32% 17%;
+    --input: 217 32% 17%;
+    --ring: 217 91% 60%;
+
+    --success: 158 64% 35%;
+    --warning: 38 92% 45%;
+    --receivable: 158 64% 35%;
+    --payable: 0 63% 50%;
+    --incoming: 158 64% 35%;
+    --outgoing: 25 95% 48%;
+
+    --sidebar-background: 222 47% 4%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 32% 15%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 32% 15%;
+    --sidebar-ring: 217 91% 60%;
+
+    --table-header: 222 47% 10%;
+    --table-row-alt: 222 47% 7%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  .table-container {
+    @apply overflow-auto rounded-lg border border-border;
+  }
+
+  .table-sticky-header th {
+    @apply sticky top-0 bg-table-header z-10;
+  }
+}
+
+@layer components {
+  .badge-active {
+    @apply bg-success/10 text-success border border-success/20;
+  }
+
+  .badge-inactive {
+    @apply bg-muted text-muted-foreground border border-border;
+  }
+
+  .badge-incoming {
+    @apply bg-incoming/10 text-incoming border border-incoming/20;
+  }
+
+  .badge-outgoing {
+    @apply bg-outgoing/10 text-outgoing border border-outgoing/20;
+  }
+
+  .badge-receivable {
+    @apply bg-receivable/10 text-receivable border border-receivable/20;
+  }
+
+  .badge-payable {
+    @apply bg-payable/10 text-payable border border-payable/20;
+  }
+
+  .stat-card {
+    @apply bg-card rounded-xl border border-border p-5 shadow-sm;
+  }
+
+  .stat-card-primary {
+    @apply bg-primary text-primary-foreground rounded-xl p-5 shadow-sm;
+  }
+
+  .form-field {
+    @apply flex flex-col gap-1.5;
+  }
+
+  .entry-row {
+    @apply flex flex-wrap gap-3 items-end p-4 bg-card rounded-lg border border-border;
+  }
+
+  .table-row-clickable {
+    @apply hover:bg-accent/50 cursor-pointer transition-colors;
+  }
+}
+
+@layer utilities {
+  .currency-positive {
+    @apply text-success font-medium;
+  }
+
+  .currency-negative {
+    @apply text-payable font-medium;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-muted rounded-full;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full hover:bg-muted-foreground/50;
+  }
+}

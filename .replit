@@ -9,6 +9,7 @@ args = ["pnpm", "store", "prune"]
 env = { "CI" = "true" }
 
 [workflows]
+runButton = "Project"
 
 [agent]
 stack = "PNPM_WORKSPACE"
@@ -30,5 +31,15 @@ externalPort = 8080
 localPort = 8081
 externalPort = 80
 
+[[ports]]
+localPort = 26246
+externalPort = 3000
+
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+VITE_SUPABASE_URL = "https://ngdcjstswqdjwovegsvq.supabase.co"
+VITE_SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5nZGNqc3Rzd3FkandvdmVnc3ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwOTkyMzUsImV4cCI6MjA4NDY3NTIzNX0.U6MqUaCjk5gyzNZxS4S6HJjQFUIXi6jpkJ2U0yYr3Cc"

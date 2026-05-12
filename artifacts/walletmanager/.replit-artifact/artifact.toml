@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/walletmanager/"
+title = "Wallet Manager"
+version = "1.0.0"
+id = "artifacts/walletmanager"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/walletmanager/" ]
+localPort = 26246
+
+[services.development]
+run = "pnpm --filter @workspace/walletmanager run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/walletmanager", "run", "build" ]
+publicDir = "artifacts/walletmanager/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "26246"
+BASE_PATH = "/walletmanager/"
