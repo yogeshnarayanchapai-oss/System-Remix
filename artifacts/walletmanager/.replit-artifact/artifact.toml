@@ -1,5 +1,5 @@
 kind = "web"
-previewPath = "/walletmanager/"
+previewPath = "/"
 title = "Wallet Manager"
 version = "1.0.0"
 id = "artifacts/walletmanager"
@@ -11,7 +11,7 @@ version = "1.0.0"
 
 [[services]]
 name = "web"
-paths = [ "/walletmanager/" ]
+paths = [ "/" ]
 localPort = 26246
 
 [services.development]
@@ -28,4 +28,4 @@ to = "/index.html"
 
 [services.env]
 PORT = "26246"
-BASE_PATH = "/walletmanager/"
+BASE_PATH = "/"
