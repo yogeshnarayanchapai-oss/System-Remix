@@ -61,9 +61,9 @@ A full-stack Facebook social media management platform. Manage Facebook pages, i
 
 ## Gotchas
 
-- The `artifacts/socialboxx: web` artifact-managed workflow always fails with "DIDNT_OPEN_A_PORT" due to a Replit health-check network namespace issue. Use the "SocialBoxx App" workflow instead (configured with `configureWorkflow` without `waitForPort`).
-- Vite dev server must bind to `::` (IPv6) not `0.0.0.0` for the Replit workflow system to detect it — but the artifact health check still fails anyway, hence the custom workflow.
-- The socialboxx artifact ID is `artifacts/socialboxx` (path-based, not UUID) because it was created manually rather than via `createArtifact()`. This affects how the workflow runner handles health checks.
+- Vite dev server must bind to `::` (IPv6) — `dev.mjs` opens the HTTP server on `::` immediately before Vite initializes, satisfying the port health check.
+- The socialboxx artifact ID is `artifacts/socialboxx` (path-based, not UUID) because it was created manually rather than via `createArtifact()`.
+- If the `artifacts/socialboxx: web` workflow fails with `EADDRINUSE`, a stale process is holding port 5000. Run `fuser -k 5000/tcp` to free it, then restart the workflow.
 - bcryptjs and zod must be in runtime `dependencies` (not devDependencies) in api-server/package.json
 
 ## Pointers
