@@ -3,20 +3,48 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: SocialBoxx - Facebook Social Media Management Platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication & user management
+  - name: organizations
+    description: Organization management
+  - name: pages
+    description: Connected Facebook pages
+  - name: page-groups
+    description: Page groups
+  - name: conversations
+    description: Inbox conversations
+  - name: messages
+    description: Conversation messages
+  - name: leads
+    description: Lead management
+  - name: automation
+    description: Automation rules
+  - name: templates
+    description: Reply templates
+  - name: dashboard
+    description: Dashboard statistics
+  - name: reports
+    description: Reports and analytics
+  - name: settings
+    description: App settings
+  - name: team
+    description: Team management
+  - name: admin
+    description: Platform admin
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +52,1564 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ─── AUTH ────────────────────────────────────────────────────────────────
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user profile
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Unauthorized
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register user (creates org or joins pending state)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResult"
+        "401":
+          description: Invalid credentials
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+
+  # ─── ORGANIZATIONS ────────────────────────────────────────────────────────
+  /organizations:
+    get:
+      operationId: listOrganizations
+      tags: [organizations]
+      summary: List all organizations (platform admin only)
+      responses:
+        "200":
+          description: List of organizations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Organization"
+
+  /organizations/{id}:
+    get:
+      operationId: getOrganization
+      tags: [organizations]
+      summary: Get organization by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateOrganization
+      tags: [organizations]
+      summary: Update organization
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrganizationUpdate"
+      responses:
+        "200":
+          description: Updated organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+    delete:
+      operationId: deleteOrganization
+      tags: [organizations]
+      summary: Delete organization (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /organizations/{id}/approve:
+    post:
+      operationId: approveOrganization
+      tags: [organizations]
+      summary: Approve organization
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+
+  /organizations/{id}/reject:
+    post:
+      operationId: rejectOrganization
+      tags: [organizations]
+      summary: Reject organization
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectInput"
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+
+  # ─── PAGES ────────────────────────────────────────────────────────────────
+  /pages:
+    get:
+      operationId: listPages
+      tags: [pages]
+      summary: List connected pages for organization
+      responses:
+        "200":
+          description: List of pages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConnectedPage"
+    post:
+      operationId: createPage
+      tags: [pages]
+      summary: Connect a new Facebook page
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PageInput"
+      responses:
+        "201":
+          description: Created page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectedPage"
+
+  /pages/{id}:
+    get:
+      operationId: getPage
+      tags: [pages]
+      summary: Get page by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectedPage"
+        "404":
+          description: Not found
+    patch:
+      operationId: updatePage
+      tags: [pages]
+      summary: Update page settings
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PageUpdate"
+      responses:
+        "200":
+          description: Updated page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectedPage"
+    delete:
+      operationId: deletePage
+      tags: [pages]
+      summary: Disconnect page
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  # ─── PAGE GROUPS ─────────────────────────────────────────────────────────
+  /page-groups:
+    get:
+      operationId: listPageGroups
+      tags: [page-groups]
+      summary: List page groups
+      responses:
+        "200":
+          description: List of groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PageGroup"
+    post:
+      operationId: createPageGroup
+      tags: [page-groups]
+      summary: Create page group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PageGroupInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageGroup"
+
+  /page-groups/{id}:
+    delete:
+      operationId: deletePageGroup
+      tags: [page-groups]
+      summary: Delete page group
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  # ─── CONVERSATIONS ────────────────────────────────────────────────────────
+  /conversations:
+    get:
+      operationId: listConversations
+      tags: [conversations]
+      summary: List conversations
+      parameters:
+        - name: pageId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Conversation"
+
+  /conversations/{id}:
+    get:
+      operationId: getConversation
+      tags: [conversations]
+      summary: Get conversation by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+    patch:
+      operationId: updateConversation
+      tags: [conversations]
+      summary: Update conversation status/tags
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConversationUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+    delete:
+      operationId: deleteConversation
+      tags: [conversations]
+      summary: Soft-delete conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  # ─── MESSAGES ────────────────────────────────────────────────────────────
+  /conversations/{conversationId}/messages:
+    get:
+      operationId: listMessages
+      tags: [messages]
+      summary: Get messages in a conversation
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+    post:
+      operationId: sendMessage
+      tags: [messages]
+      summary: Send a message
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageInput"
+      responses:
+        "201":
+          description: Sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
+  # ─── LEADS ───────────────────────────────────────────────────────────────
+  /leads:
+    get:
+      operationId: listLeads
+      tags: [leads]
+      summary: List leads
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: pageId
+          in: query
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of leads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Lead"
+    post:
+      operationId: createLead
+      tags: [leads]
+      summary: Create a lead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+
+  /leads/stats:
+    get:
+      operationId: getLeadStats
+      tags: [leads]
+      summary: Get lead statistics
+      responses:
+        "200":
+          description: Lead stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadStats"
+
+  /leads/{id}:
+    get:
+      operationId: getLead
+      tags: [leads]
+      summary: Get lead by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Lead
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+    patch:
+      operationId: updateLead
+      tags: [leads]
+      summary: Update lead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+    delete:
+      operationId: deleteLead
+      tags: [leads]
+      summary: Delete lead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  # ─── AUTOMATION RULES ────────────────────────────────────────────────────
+  /automation/rules:
+    get:
+      operationId: listAutomationRules
+      tags: [automation]
+      summary: List automation rules
+      responses:
+        "200":
+          description: Rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AutomationRule"
+    post:
+      operationId: createAutomationRule
+      tags: [automation]
+      summary: Create automation rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AutomationRuleInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutomationRule"
+
+  /automation/rules/{id}:
+    patch:
+      operationId: updateAutomationRule
+      tags: [automation]
+      summary: Update automation rule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AutomationRuleUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutomationRule"
+    delete:
+      operationId: deleteAutomationRule
+      tags: [automation]
+      summary: Delete rule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /automation/rules/{id}/toggle:
+    post:
+      operationId: toggleAutomationRule
+      tags: [automation]
+      summary: Toggle rule active state
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Toggled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutomationRule"
+
+  # ─── REPLY TEMPLATES ─────────────────────────────────────────────────────
+  /automation/templates:
+    get:
+      operationId: listReplyTemplates
+      tags: [templates]
+      summary: List reply templates
+      responses:
+        "200":
+          description: Templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReplyTemplate"
+    post:
+      operationId: createReplyTemplate
+      tags: [templates]
+      summary: Create reply template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplyTemplateInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReplyTemplate"
+
+  /automation/templates/{id}:
+    patch:
+      operationId: updateReplyTemplate
+      tags: [templates]
+      summary: Update template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplyTemplateUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReplyTemplate"
+    delete:
+      operationId: deleteReplyTemplate
+      tags: [templates]
+      summary: Delete template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /automation/templates/{id}/toggle:
+    post:
+      operationId: toggleReplyTemplate
+      tags: [templates]
+      summary: Toggle template active state
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Toggled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReplyTemplate"
+
+  # ─── DASHBOARD ────────────────────────────────────────────────────────────
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [dashboard]
+      summary: Get dashboard statistics
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /dashboard/recent-conversations:
+    get:
+      operationId: getRecentConversations
+      tags: [dashboard]
+      summary: Get recent conversations for dashboard
+      responses:
+        "200":
+          description: Recent conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Conversation"
+
+  /dashboard/page-performance:
+    get:
+      operationId: getPagePerformance
+      tags: [dashboard]
+      summary: Get page performance metrics
+      responses:
+        "200":
+          description: Page performance
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PagePerformance"
+
+  # ─── REPORTS ─────────────────────────────────────────────────────────────
+  /reports/data:
+    get:
+      operationId: getReportsData
+      tags: [reports]
+      summary: Get reports data for charts
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: ["7d", "30d"]
+      responses:
+        "200":
+          description: Reports data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportsData"
+
+  # ─── SETTINGS ────────────────────────────────────────────────────────────
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get app settings for current org
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppSettings"
+    patch:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update app settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppSettingsUpdate"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppSettings"
+
+  # ─── TEAM ────────────────────────────────────────────────────────────────
+  /team/members:
+    get:
+      operationId: listTeamMembers
+      tags: [team]
+      summary: List team members
+      responses:
+        "200":
+          description: Team members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeamMember"
+    post:
+      operationId: inviteTeamMember
+      tags: [team]
+      summary: Invite team member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamMemberInvite"
+      responses:
+        "201":
+          description: Invited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamMember"
+
+  /team/members/{id}:
+    patch:
+      operationId: updateTeamMember
+      tags: [team]
+      summary: Update team member role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamMemberUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamMember"
+    delete:
+      operationId: removeTeamMember
+      tags: [team]
+      summary: Remove team member
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Removed
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    # ─── USER ────────────────────────────────────────────────────────────
+    UserProfile:
+      type: object
+      required: [id, email]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        fullName:
+          type: ["string", "null"]
+        avatarUrl:
+          type: ["string", "null"]
+        role:
+          type: string
+          enum: [admin, manager, agent]
+        isPlatformAdmin:
+          type: boolean
+        organizationId:
+          type: ["string", "null"]
+        organizationName:
+          type: ["string", "null"]
+        organizationStatus:
+          type: ["string", "null"]
+
+    RegisterInput:
+      type: object
+      required: [email, password, fullName, organizationName]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+          minLength: 6
+        fullName:
+          type: string
+        organizationName:
+          type: string
+
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    LoginResult:
+      type: object
+      required: [user, token]
+      properties:
+        user:
+          $ref: "#/components/schemas/UserProfile"
+        token:
+          type: string
+
+    # ─── ORGANIZATION ────────────────────────────────────────────────────
+    Organization:
+      type: object
+      required: [id, name, status, ownerId, plan]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        ownerId:
+          type: string
+        ownerEmail:
+          type: ["string", "null"]
+        plan:
+          type: string
+        maxPages:
+          type: integer
+        maxTeamMembers:
+          type: integer
+        rejectedReason:
+          type: ["string", "null"]
+        approvedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    OrganizationUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        maxPages:
+          type: integer
+        maxTeamMembers:
+          type: integer
+        plan:
+          type: string
+
+    RejectInput:
+      type: object
+      properties:
+        reason:
+          type: ["string", "null"]
+
+    # ─── CONNECTED PAGE ──────────────────────────────────────────────────
+    ConnectedPage:
+      type: object
+      required: [id, pageId, pageName, connectionStatus, organizationId]
+      properties:
+        id:
+          type: string
+        pageId:
+          type: string
+        pageName:
+          type: string
+        pagePictureUrl:
+          type: ["string", "null"]
+        connectionStatus:
+          type: string
+        organizationId:
+          type: string
+        groupId:
+          type: ["string", "null"]
+        groupName:
+          type: ["string", "null"]
+        aiEnabled:
+          type: boolean
+        automationEnabled:
+          type: boolean
+        aiInstructions:
+          type: ["string", "null"]
+        aiDescription:
+          type: ["string", "null"]
+        productName:
+          type: ["string", "null"]
+        productDescription:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    PageInput:
+      type: object
+      required: [pageId, pageName, pageAccessToken]
+      properties:
+        pageId:
+          type: string
+        pageName:
+          type: string
+        pageAccessToken:
+          type: string
+        pagePictureUrl:
+          type: ["string", "null"]
+        groupId:
+          type: ["string", "null"]
+
+    PageUpdate:
+      type: object
+      properties:
+        pageName:
+          type: string
+        connectionStatus:
+          type: string
+        groupId:
+          type: ["string", "null"]
+        aiEnabled:
+          type: boolean
+        automationEnabled:
+          type: boolean
+        aiInstructions:
+          type: ["string", "null"]
+        aiDescription:
+          type: ["string", "null"]
+        productName:
+          type: ["string", "null"]
+        productDescription:
+          type: ["string", "null"]
+
+    # ─── PAGE GROUP ──────────────────────────────────────────────────────
+    PageGroup:
+      type: object
+      required: [id, name, organizationId]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        organizationId:
+          type: string
+        createdAt:
+          type: string
+
+    PageGroupInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+
+    # ─── CONVERSATION ────────────────────────────────────────────────────
+    Conversation:
+      type: object
+      required: [id, pageId, participantId, participantName, status]
+      properties:
+        id:
+          type: string
+        pageId:
+          type: string
+        pageName:
+          type: ["string", "null"]
+        organizationId:
+          type: string
+        participantId:
+          type: string
+        participantName:
+          type: string
+        participantProfilePic:
+          type: ["string", "null"]
+        lastMessage:
+          type: ["string", "null"]
+        lastMessageAt:
+          type: ["string", "null"]
+        status:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        unreadCount:
+          type: integer
+        autoFollowupStep:
+          type: integer
+        aiFollowupStep:
+          type: integer
+        assignedTo:
+          type: ["string", "null"]
+        deletedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    ConversationUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        assignedTo:
+          type: ["string", "null"]
+
+    # ─── MESSAGE ─────────────────────────────────────────────────────────
+    Message:
+      type: object
+      required: [id, conversationId, senderType, content]
+      properties:
+        id:
+          type: string
+        conversationId:
+          type: string
+        senderType:
+          type: string
+          enum: [customer, page]
+        content:
+          type: string
+        mediaUrl:
+          type: ["string", "null"]
+        messageType:
+          type: string
+        isInternalNote:
+          type: boolean
+        isAiReply:
+          type: boolean
+        sentBy:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    MessageInput:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+        mediaUrl:
+          type: ["string", "null"]
+        isInternalNote:
+          type: boolean
+
+    # ─── LEAD ────────────────────────────────────────────────────────────
+    Lead:
+      type: object
+      required: [id, fullName, status, organizationId]
+      properties:
+        id:
+          type: string
+        fullName:
+          type: string
+        phone:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [new, pulled, hot, follow_up, closed]
+        pageId:
+          type: ["string", "null"]
+        pageName:
+          type: ["string", "null"]
+        organizationId:
+          type: string
+        conversationId:
+          type: ["string", "null"]
+        product:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        followupDueDate:
+          type: ["string", "null"]
+        assignedTo:
+          type: ["string", "null"]
+        createdBy:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    LeadInput:
+      type: object
+      required: [fullName]
+      properties:
+        fullName:
+          type: string
+        phone:
+          type: ["string", "null"]
+        pageId:
+          type: ["string", "null"]
+        product:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        status:
+          type: string
+
+    LeadUpdate:
+      type: object
+      properties:
+        fullName:
+          type: string
+        phone:
+          type: ["string", "null"]
+        status:
+          type: string
+        product:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        followupDueDate:
+          type: ["string", "null"]
+        assignedTo:
+          type: ["string", "null"]
+
+    LeadStats:
+      type: object
+      required: [total, new, hot, follow_up, closed]
+      properties:
+        total:
+          type: integer
+        new:
+          type: integer
+        hot:
+          type: integer
+        follow_up:
+          type: integer
+        closed:
+          type: integer
+
+    # ─── AUTOMATION RULE ─────────────────────────────────────────────────
+    AutomationRule:
+      type: object
+      required: [id, name, triggerType, isActive]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        triggerType:
+          type: string
+        isActive:
+          type: boolean
+        autoSend:
+          type: boolean
+        pageId:
+          type: ["string", "null"]
+        organizationId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    AutomationRuleInput:
+      type: object
+      required: [name, triggerType]
+      properties:
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        triggerType:
+          type: string
+        autoSend:
+          type: boolean
+        pageId:
+          type: ["string", "null"]
+
+    AutomationRuleUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        triggerType:
+          type: string
+        isActive:
+          type: boolean
+        autoSend:
+          type: boolean
+
+    # ─── REPLY TEMPLATE ──────────────────────────────────────────────────
+    ReplyTemplate:
+      type: object
+      required: [id, name, content, category, isActive]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+        content:
+          type: string
+        isActive:
+          type: boolean
+        organizationId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    ReplyTemplateInput:
+      type: object
+      required: [name, content]
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        content:
+          type: string
+
+    ReplyTemplateUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        content:
+          type: string
+        isActive:
+          type: boolean
+
+    # ─── DASHBOARD ───────────────────────────────────────────────────────
+    DashboardStats:
+      type: object
+      required: [totalMessagesToday, unrepliedCount, aiFailedCount, leadsPending, followUpsDue, replyRate, todayFollowupTotal]
+      properties:
+        totalMessagesToday:
+          type: integer
+        unrepliedCount:
+          type: integer
+        aiFailedCount:
+          type: integer
+        leadsPending:
+          type: integer
+        followUpsDue:
+          type: integer
+        replyRate:
+          type: string
+        todayFollowupTotal:
+          type: integer
+        avgResponseTime:
+          type: string
+
+    PagePerformance:
+      type: object
+      required: [name, messages, leads, rate]
+      properties:
+        name:
+          type: string
+        messages:
+          type: integer
+        leads:
+          type: integer
+        rate:
+          type: string
+
+    # ─── REPORTS ─────────────────────────────────────────────────────────
+    ReportsData:
+      type: object
+      required: [totalMessages, leadsCreated, chartData, leadFunnel]
+      properties:
+        totalMessages:
+          type: integer
+        leadsCreated:
+          type: integer
+        chartData:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChartDataPoint"
+        leadFunnel:
+          type: array
+          items:
+            $ref: "#/components/schemas/FunnelDataPoint"
+
+    ChartDataPoint:
+      type: object
+      required: [date, messages, replies]
+      properties:
+        date:
+          type: string
+        messages:
+          type: integer
+        replies:
+          type: integer
+
+    FunnelDataPoint:
+      type: object
+      required: [name, value]
+      properties:
+        name:
+          type: string
+        value:
+          type: integer
+
+    # ─── SETTINGS ────────────────────────────────────────────────────────
+    AppSettings:
+      type: object
+      required: [organizationId]
+      properties:
+        organizationId:
+          type: ["string", "null"]
+        facebookAppId:
+          type: ["string", "null"]
+        facebookAppSecret:
+          type: ["string", "null"]
+        facebookWebhookToken:
+          type: ["string", "null"]
+        aiTone:
+          type: ["string", "null"]
+        aiModel:
+          type: ["string", "null"]
+        notificationsEnabled:
+          type: boolean
+
+    AppSettingsUpdate:
+      type: object
+      properties:
+        facebookAppId:
+          type: ["string", "null"]
+        facebookAppSecret:
+          type: ["string", "null"]
+        facebookWebhookToken:
+          type: ["string", "null"]
+        aiTone:
+          type: ["string", "null"]
+        aiModel:
+          type: ["string", "null"]
+        notificationsEnabled:
+          type: boolean
+
+    # ─── TEAM ────────────────────────────────────────────────────────────
+    TeamMember:
+      type: object
+      required: [id, userId, organizationId, role]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        organizationId:
+          type: string
+        role:
+          type: string
+          enum: [admin, manager, agent]
+        email:
+          type: ["string", "null"]
+        fullName:
+          type: ["string", "null"]
+        joinedAt:
+          type: ["string", "null"]
+
+    TeamMemberInvite:
+      type: object
+      required: [email, role]
+      properties:
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin, manager, agent]
+
+    TeamMemberUpdate:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [admin, manager, agent]

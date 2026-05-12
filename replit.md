@@ -1,45 +1,73 @@
-# [Project name]
+# SocialBoxx
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A full-stack Facebook social media management platform. Manage Facebook pages, inbox conversations, leads, automation rules, reports, and team settings from one command center.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `PORT=5000 BASE_PATH=/ pnpm --filter @workspace/socialboxx run dev` — run the frontend dev server (port 5000)
+- `pnpm --filter @workspace/api-server run dev` — run the API server (port 8080, served at /api)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Required env: `DATABASE_URL` — Postgres connection string, `SESSION_SECRET` — JWT secret
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
+- Frontend: React + Vite, Tailwind CSS v4, shadcn/ui, wouter, TanStack Query
+- API: Express 5, JWT auth
 - DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
+- Validation: Zod, drizzle-zod
 - API codegen: Orval (from OpenAPI spec)
 - Build: esbuild (CJS bundle)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/socialboxx/` — React+Vite frontend
+- `artifacts/socialboxx/src/pages/` — all page components (auth, dashboard, pages, inbox, leads, automation, reports, settings, admin)
+- `artifacts/socialboxx/src/hooks/use-auth.tsx` — JWT auth context
+- `artifacts/api-server/src/routes/` — all Express route handlers
+- `lib/api-spec/openapi.yaml` — OpenAPI spec (source of truth for API contracts)
+- `lib/db/src/schema/` — Drizzle ORM schema (source of truth for DB)
+- `lib/api-client-react/` — generated React Query hooks + Zod schemas
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- JWT tokens stored in localStorage as `sb_token`; auth middleware reads `Authorization: Bearer <token>` header
+- OpenAPI-first: spec gates codegen, which gates the frontend; always run codegen after changing the spec
+- All API routes served under `/api` prefix via reverse proxy
+- Frontend dev server uses Node.js HTTP server wrapping Vite middleware (`dev.mjs`) bound to `::` (IPv6 dual-stack) on port 5000
+- The "SocialBoxx App" workflow bypasses the artifact-managed workflow's broken port detection; use it instead of the artifact workflow
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- **Auth**: JWT login/register, email-based, roles (admin/member/pending/rejected)
+- **Dashboard**: KPI cards, recent conversations, quick stats
+- **Pages**: Facebook page management (connect, stats, toggle active)
+- **Inbox**: Conversation list, messaging, lead conversion
+- **Leads**: CRM-style lead tracking with pipeline stages
+- **Automation**: Rule-based auto-reply triggers
+- **Reports**: Analytics charts (messages, response time, lead conversion)
+- **Settings**: Organization settings, notification preferences
+- **Admin**: User management, role assignment
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Zod v3.x — use `import { z } from "zod"` (NOT `"zod/v4"`)
+- Express 5 params: always cast with `String(req.params.id)` (params are `string | string[]`)
+- Never use `console.log` in server code — use `req.log` in routes, `logger` elsewhere
+- Theme: deep navy sidebar (hsl(224 40% 12%)), indigo primary (hsl(230 100% 60%))
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- The `artifacts/socialboxx: web` artifact-managed workflow always fails with "DIDNT_OPEN_A_PORT" due to a Replit health-check network namespace issue. Use the "SocialBoxx App" workflow instead (configured with `configureWorkflow` without `waitForPort`).
+- Vite dev server must bind to `::` (IPv6) not `0.0.0.0` for the Replit workflow system to detect it — but the artifact health check still fails anyway, hence the custom workflow.
+- The socialboxx artifact ID is `artifacts/socialboxx` (path-based, not UUID) because it was created manually rather than via `createArtifact()`. This affects how the workflow runner handles health checks.
+- bcryptjs and zod must be in runtime `dependencies` (not devDependencies) in api-server/package.json
 
 ## Pointers
 
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- OpenAPI spec: `lib/api-spec/openapi.yaml`
+- DB schema: `lib/db/src/schema/index.ts`
