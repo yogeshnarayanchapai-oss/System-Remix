@@ -73,6 +73,7 @@ export default function Live() {
   const [isLoadingCode, setIsLoadingCode] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [showRequestPassword, setShowRequestPassword] = useState(false);
 
   // Auth for admin check
   const { user } = useAuth();
@@ -369,7 +370,9 @@ export default function Live() {
   const errorDisplay = error ? getErrorDisplay(error.code) : null;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 gap-4">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-start sm:justify-center px-4 py-6 gap-4 pb-safe"
+      style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))", paddingTop: "max(1.5rem, env(safe-area-inset-top))" }}
+    >
       {/* Active Email Search Card */}
       <div className="w-full max-w-md">
         <ActiveEmailSearch />
@@ -434,20 +437,32 @@ export default function Live() {
                   <Lock className="inline h-4 w-4 mr-1" />
                   Password
                 </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    if (errorField === 'password') {
-                      setError(null);
-                    }
-                  }}
-                  disabled={isLoading}
-                  className={errorField === 'password' ? 'border-destructive focus-visible:ring-destructive' : ''}
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showRequestPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (errorField === 'password') {
+                        setError(null);
+                      }
+                    }}
+                    disabled={isLoading}
+                    className={`pr-10 ${errorField === 'password' ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowRequestPassword(!showRequestPassword)}
+                    tabIndex={-1}
+                  >
+                    {showRequestPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
 
               {/* Turnstile Captcha */}
@@ -469,11 +484,6 @@ export default function Live() {
                 )}
               </Button>
 
-              <div className="text-center text-sm text-muted-foreground">
-                <Link to="/userlogin" className="text-primary hover:underline">
-                  Party Login →
-                </Link>
-              </div>
             </div>
           )}
 
