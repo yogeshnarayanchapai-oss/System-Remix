@@ -605,7 +605,7 @@ export default function Live() {
               {/* TOTP */}
               {hasTotp && (
                 <div className="space-y-2">
-                  <Label>2FA Code</Label>
+                  <Label>Paypal 2FA Code</Label>
                   <div className="flex gap-2">
                     {totpCode ? (
                       <>
