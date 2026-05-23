@@ -574,7 +574,7 @@ export default function Live() {
 
               {/* Password */}
               <div className="space-y-2">
-                <Label>Password</Label>
+                <Label>Paypal Password</Label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <Input
