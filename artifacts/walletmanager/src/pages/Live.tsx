@@ -559,7 +559,7 @@ export default function Live() {
 
               {/* Email */}
               <div className="space-y-2">
-                <Label>Email / User ID</Label>
+                <Label>Paypal Email</Label>
                 <div className="flex gap-2">
                   <Input value={credEmail} readOnly className="font-mono" />
                   <Button variant="outline" size="icon" onClick={() => copyToClipboard(credEmail, "email")}>
