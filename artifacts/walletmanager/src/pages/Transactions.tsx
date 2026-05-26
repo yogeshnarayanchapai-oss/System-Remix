@@ -1,4 +1,7 @@
 import { useState, useMemo } from 'react';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 import { format, subDays, startOfDay } from 'date-fns';
 import { 
   Search, 
@@ -93,7 +96,16 @@ export default function Transactions() {
   const deleteTransaction = useDeleteTransaction();
   const deleteTransfer = useDeleteWalletTransfer();
 
-  const handleEdit = (txn: Transaction) => setEditingTxn(txn);
+  const { user } = useAuth();
+  const { role } = useUserRole();
+  const isAdmin = user && role === "ADMIN";
+
+  const notifyAdmin = () => toast.error("Contact Admin to perform this action");
+
+  const handleEdit = (txn: Transaction) => {
+    if (!isAdmin) { notifyAdmin(); return; }
+    setEditingTxn(txn);
+  };
   const handleUpdateSubmit = async () => {
     if (!editingTxn) return;
     await updateTransaction.mutateAsync({
@@ -273,7 +285,7 @@ export default function Transactions() {
                                 <Edit2 className="h-4 w-4 mr-2" />
                                 Edit
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setDeleteId(txn.id)} className="text-destructive focus:text-destructive">
+                              <DropdownMenuItem onClick={() => { if (!isAdmin) { notifyAdmin(); return; } setDeleteId(txn.id); }} className="text-destructive focus:text-destructive">
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete
                               </DropdownMenuItem>
@@ -361,7 +373,7 @@ export default function Transactions() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="bg-popover">
-                                  <DropdownMenuItem onClick={() => setDeleteTransferId(transfer.id)} className="text-destructive focus:text-destructive">
+                                  <DropdownMenuItem onClick={() => { if (!isAdmin) { notifyAdmin(); return; } setDeleteTransferId(transfer.id); }} className="text-destructive focus:text-destructive">
                                     <Trash2 className="h-4 w-4 mr-2" />
                                     Delete
                                   </DropdownMenuItem>

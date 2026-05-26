@@ -279,6 +279,7 @@ export default function Parties() {
                               variant="ghost"
                               size="icon"
                             onClick={() => {
+                                if (!isAdmin) { toast.error("Contact Admin to perform this action"); return; }
                                 setForm({ 
                                   party_name: party.party_name, 
                                   phone: party.phone || '', 
@@ -296,7 +297,7 @@ export default function Parties() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => setDeleteId(party.id)}
+                              onClick={() => { if (!isAdmin) { toast.error("Contact Admin to perform this action"); return; } setDeleteId(party.id); }}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>

@@ -1,4 +1,7 @@
 import { useState, useMemo } from 'react';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -93,6 +96,12 @@ export default function WalletAccounts() {
   const createAccount = useCreatePaypalAccount();
   const updateAccount = useUpdatePaypalAccount();
   const deleteAccount = useDeletePaypalAccount();
+
+  const { user } = useAuth();
+  const { role } = useUserRole();
+  const isAdmin = user && role === "ADMIN";
+
+  const notifyAdmin = () => toast.error("Contact Admin to perform this action");
   const createEmail = useCreatePaypalEmail();
   const updateEmail = useUpdatePaypalEmail();
   const deleteEmail = useDeletePaypalEmail();
@@ -391,6 +400,7 @@ export default function WalletAccounts() {
                                 Manage Emails
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => {
+                                if (!isAdmin) { notifyAdmin(); return; }
                                 setAccountForm({ 
                                   paypal_name: account.paypal_name, 
                                   note: account.note || '',
@@ -402,11 +412,11 @@ export default function WalletAccounts() {
                                 <Edit2 className="h-4 w-4 mr-2" />
                                 Edit
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleToggleActive(account)}>
+                              <DropdownMenuItem onClick={() => { if (!isAdmin) { notifyAdmin(); return; } handleToggleActive(account); }}>
                                 <Power className={`h-4 w-4 mr-2 ${account.is_active ? 'text-success' : 'text-muted-foreground'}`} />
                                 {account.is_active ? 'Deactivate' : 'Activate'}
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setDeleteAccountId(account.id)} className="text-destructive focus:text-destructive">
+                              <DropdownMenuItem onClick={() => { if (!isAdmin) { notifyAdmin(); return; } setDeleteAccountId(account.id); }} className="text-destructive focus:text-destructive">
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete
                               </DropdownMenuItem>
