@@ -1,0 +1,1 @@
+- [Wallet Manager dev binding](walletmanager-dev-binding.md) — this environment may not support IPv6 `::`; bind the Vite middleware server to IPv4.

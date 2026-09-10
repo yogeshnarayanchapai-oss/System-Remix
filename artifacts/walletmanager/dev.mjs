@@ -20,8 +20,8 @@ const httpServer = createServer((req, res) => {
   }
 });
 
-httpServer.listen(port, "::", () => {
-  console.log(`\n  WalletManager dev server listening on :::${port}`);
+httpServer.listen(port, "0.0.0.0", () => {
+  console.log(`\n  WalletManager dev server listening on 0.0.0.0:${port}`);
   console.log(`  ➜  Local:   http://localhost:${port}${basePath}\n`);
 });
 
