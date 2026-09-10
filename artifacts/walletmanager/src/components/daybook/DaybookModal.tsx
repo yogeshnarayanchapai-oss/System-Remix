@@ -1,9 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowDownLeft, ArrowUpRight, BookOpen, ExternalLink, Loader2 } from 'lucide-react';
+import { ArrowLeftRight, BookOpen, ExternalLink } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDaybook } from '@/hooks/useDaybook';
@@ -16,168 +14,174 @@ interface DaybookModalProps {
   dateTo?: string;
 }
 
-function Direction({ value }: { value: 'INCOMING' | 'OUTGOING' }) {
-  const isIncoming = value === 'INCOMING';
-  return (
-    <span className={`inline-flex items-center gap-1 text-xs font-medium ${isIncoming ? 'text-success' : 'text-outgoing'}`}>
-      {isIncoming ? <ArrowDownLeft className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
-      {isIncoming ? 'Incoming' : 'Outgoing'}
-    </span>
-  );
-}
+type Currency = 'NPR' | 'USD';
 
 export function DaybookModal({ open, onOpenChange, dateFrom, dateTo }: DaybookModalProps) {
-  const [currency, setCurrency] = useState<'USD' | 'NPR'>('USD');
+  const [currency, setCurrency] = useState<Currency>('NPR');
   const { data, isLoading, error } = useDaybook({ dateFrom, dateTo, enabled: open });
 
-  const usdTotals = useMemo(() => (data?.usd || []).reduce(
-    (totals, entry) => {
-      totals.incoming += entry.direction === 'INCOMING' ? entry.amountUsd : 0;
-      totals.outgoing += entry.direction === 'OUTGOING' ? entry.amountUsd : 0;
-      return totals;
-    },
-    { incoming: 0, outgoing: 0 },
-  ), [data?.usd]);
+  const summary = useMemo(() => {
+    const totals = {
+      receivedUsd: 0,
+      receivedNpr: 0,
+      paymentUsd: 0,
+      paymentNpr: 0,
+      partyIncomingNpr: 0,
+      partyOutgoingNpr: 0,
+    };
 
-  const nprTotals = useMemo(() => (data?.npr || []).reduce(
-    (totals, entry) => {
-      totals.incoming += entry.direction === 'INCOMING' ? entry.amountNpr : 0;
-      totals.outgoing += entry.direction === 'OUTGOING' ? entry.amountNpr : 0;
-      return totals;
-    },
-    { incoming: 0, outgoing: 0 },
-  ), [data?.npr]);
+    data?.usd.forEach((entry) => {
+      if (entry.direction === 'INCOMING') {
+        totals.receivedUsd += entry.amountUsd;
+        totals.receivedNpr += entry.totalNpr;
+      } else {
+        totals.paymentUsd += entry.amountUsd;
+        totals.paymentNpr += entry.totalNpr;
+      }
+    });
+
+    data?.npr.forEach((entry) => {
+      if (entry.direction === 'INCOMING') {
+        totals.partyIncomingNpr += entry.amountNpr;
+      } else {
+        totals.partyOutgoingNpr += entry.amountNpr;
+      }
+    });
+
+    const averageRate = totals.receivedUsd > 0 ? totals.receivedNpr / totals.receivedUsd : 0;
+    const received = currency === 'NPR' ? totals.receivedNpr : totals.receivedUsd;
+    const payment = currency === 'NPR' ? totals.partyOutgoingNpr : totals.paymentUsd;
+    const netBalance = received - payment;
+    const partyNetNpr = totals.partyOutgoingNpr - totals.partyIncomingNpr;
+    const partyNet = currency === 'NPR' || averageRate === 0
+      ? partyNetNpr
+      : partyNetNpr / averageRate;
+
+    return {
+      ...totals,
+      averageRate,
+      received,
+      payment,
+      netBalance,
+      partyNet,
+    };
+  }, [currency, data]);
 
   const query = new URLSearchParams();
   if (dateFrom) query.set('dateFrom', dateFrom);
   if (dateTo) query.set('dateTo', dateTo);
   const queryString = query.toString();
+  const formatAmount = (amount: number) => currency === 'NPR' ? formatNPR(amount) : formatUSD(amount);
+  const nextCurrency: Currency = currency === 'NPR' ? 'USD' : 'NPR';
+  const partyBalanceLabel = summary.partyNet > 0 ? 'Receivable' : summary.partyNet < 0 ? 'Payable' : 'Settled';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-primary" />
-            Daybook
-          </DialogTitle>
-          <DialogDescription>
-            {dateFrom || dateTo ? `${dateFrom || 'Start'} to ${dateTo || 'Today'}` : 'All recorded activity'}
-          </DialogDescription>
+          <div className="flex items-start justify-between gap-4 pr-8">
+            <div>
+              <DialogTitle className="flex items-center gap-2 text-xl">
+                <BookOpen className="h-5 w-5 text-primary" />
+                Daybook
+              </DialogTitle>
+              <DialogDescription className="mt-1">
+                {dateFrom || dateTo ? `${dateFrom || 'Start'} to ${dateTo || 'Today'}` : 'All recorded activity'}
+              </DialogDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrency(nextCurrency)}
+              title={`Switch to ${nextCurrency}`}
+            >
+              {currency}
+              <ArrowLeftRight className="ml-2 h-3.5 w-3.5" />
+            </Button>
+          </div>
         </DialogHeader>
 
-        <Tabs value={currency} onValueChange={(value) => setCurrency(value as 'USD' | 'NPR')} className="min-h-0">
-          <TabsList>
-            <TabsTrigger value="USD">USD Transactions</TabsTrigger>
-            <TabsTrigger value="NPR">NPR Party Ledger</TabsTrigger>
-          </TabsList>
-
-          {isLoading ? (
-            <div className="space-y-3 py-4">
-              {[...Array(5)].map((_, index) => <Skeleton key={index} className="h-10 w-full" />)}
+        {isLoading ? (
+          <div className="space-y-4 py-4">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-36 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        ) : error ? (
+          <p className="py-8 text-center text-sm text-destructive">Unable to load Daybook summary.</p>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border-l-4 border-success bg-success/10 p-4">
+                <p className="text-sm font-medium text-muted-foreground">Total Received ({currency})</p>
+                <p className="mt-1 text-2xl font-bold text-success">{formatAmount(summary.received)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {currency === 'NPR' ? `${formatUSD(summary.receivedUsd)} received × average rate` : 'Incoming USD total'}
+                </p>
+              </div>
+              <div className="rounded-lg border-l-4 border-outgoing bg-outgoing/10 p-4">
+                <p className="text-sm font-medium text-muted-foreground">Total Payment ({currency})</p>
+                <p className="mt-1 text-2xl font-bold text-outgoing">{formatAmount(summary.payment)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {currency === 'NPR' ? 'Outgoing party ledger total' : 'Outgoing USD transaction total'}
+                </p>
+              </div>
             </div>
-          ) : error ? (
-            <p className="py-8 text-center text-sm text-destructive">Unable to load Daybook entries.</p>
-          ) : (
-            <>
-              <TabsContent value="USD" className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-lg bg-success/10 p-3">
-                    <p className="text-xs text-muted-foreground">Incoming USD</p>
-                    <p className="text-lg font-semibold text-success">{formatUSD(usdTotals.incoming)}</p>
-                  </div>
-                  <div className="rounded-lg bg-outgoing/10 p-3">
-                    <p className="text-xs text-muted-foreground">Outgoing USD</p>
-                    <p className="text-lg font-semibold text-outgoing">{formatUSD(usdTotals.outgoing)}</p>
-                  </div>
-                </div>
-                <div className="max-h-[45vh] overflow-auto rounded-md border">
-                  <Table>
-                    <TableHeader className="table-sticky-header">
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Party</TableHead>
-                        <TableHead>Wallet</TableHead>
-                        <TableHead>Direction</TableHead>
-                        <TableHead className="text-right">USD</TableHead>
-                        <TableHead className="text-right">Rate</TableHead>
-                        <TableHead className="text-right">NPR Total</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {data?.usd.length ? data.usd.map((entry) => (
-                        <TableRow key={entry.id}>
-                          <TableCell>{entry.date}</TableCell>
-                          <TableCell className="font-medium">{entry.partyName}</TableCell>
-                          <TableCell>{entry.walletName}</TableCell>
-                          <TableCell><Direction value={entry.direction} /></TableCell>
-                          <TableCell className="text-right">{formatUSD(entry.amountUsd)}</TableCell>
-                          <TableCell className="text-right">{formatNumber(entry.rate)}</TableCell>
-                          <TableCell className="text-right">{formatNPR(entry.totalNpr)}</TableCell>
-                        </TableRow>
-                      )) : (
-                        <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">No USD transactions for this period.</TableCell></TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-                <div className="flex justify-end">
-                  <Button variant="outline" size="sm" asChild>
-                    <Link to={`/transactions${queryString ? `?${queryString}` : ''}`} onClick={() => onOpenChange(false)}>
-                      View More USD Transactions <ExternalLink className="ml-2 h-3.5 w-3.5" />
-                    </Link>
-                  </Button>
-                </div>
-              </TabsContent>
 
-              <TabsContent value="NPR" className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-lg bg-success/10 p-3">
-                    <p className="text-xs text-muted-foreground">Incoming NPR</p>
-                    <p className="text-lg font-semibold text-success">{formatNPR(nprTotals.incoming)}</p>
-                  </div>
-                  <div className="rounded-lg bg-outgoing/10 p-3">
-                    <p className="text-xs text-muted-foreground">Outgoing NPR</p>
-                    <p className="text-lg font-semibold text-outgoing">{formatNPR(nprTotals.outgoing)}</p>
-                  </div>
+            <div className="overflow-hidden rounded-lg border">
+              <div className="grid grid-cols-2 bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">
+                <span>Daybook Summary</span>
+                <span className="text-right">{currency}</span>
+              </div>
+              <div className="divide-y">
+                <div className="grid grid-cols-2 px-4 py-3">
+                  <span className="text-muted-foreground">Today average rate</span>
+                  <span className="text-right font-semibold">{formatNumber(summary.averageRate)}</span>
                 </div>
-                <div className="max-h-[45vh] overflow-auto rounded-md border">
-                  <Table>
-                    <TableHeader className="table-sticky-header">
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Party</TableHead>
-                        <TableHead>Direction</TableHead>
-                        <TableHead className="text-right">Amount (NPR)</TableHead>
-                        <TableHead>Remark</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {data?.npr.length ? data.npr.map((entry) => (
-                        <TableRow key={entry.id}>
-                          <TableCell>{entry.date}</TableCell>
-                          <TableCell className="font-medium">{entry.partyName}</TableCell>
-                          <TableCell><Direction value={entry.direction} /></TableCell>
-                          <TableCell className="text-right">{formatNPR(entry.amountNpr)}</TableCell>
-                          <TableCell className="max-w-[220px] truncate">{entry.remark || '-'}</TableCell>
-                        </TableRow>
-                      )) : (
-                        <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">No NPR entries for this period.</TableCell></TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
+                <div className="grid grid-cols-2 bg-primary/10 px-4 py-3 text-lg font-bold">
+                  <span>Today Net Balance</span>
+                  <span className={`text-right ${summary.netBalance >= 0 ? 'text-success' : 'text-outgoing'}`}>
+                    {formatAmount(summary.netBalance)}
+                  </span>
                 </div>
-                <div className="flex justify-end">
-                  <Button variant="outline" size="sm" asChild>
-                    <Link to={`/receivable-payable${queryString ? `?${queryString}` : ''}`} onClick={() => onOpenChange(false)}>
-                      View More NPR Entries <ExternalLink className="ml-2 h-3.5 w-3.5" />
-                    </Link>
-                  </Button>
+                <div className="grid grid-cols-2 px-4 py-3">
+                  <span className="text-muted-foreground">Exact Receivable / Payable</span>
+                  <span className={`text-right font-semibold ${summary.partyNet >= 0 ? 'text-success' : 'text-outgoing'}`}>
+                    {formatAmount(Math.abs(summary.partyNet))} {partyBalanceLabel}
+                  </span>
                 </div>
-              </TabsContent>
-            </>
-          )}
-        </Tabs>
+              </div>
+            </div>
+
+            <div className="grid gap-3 text-sm sm:grid-cols-3">
+              <div className="rounded-md bg-muted/60 p-3">
+                <p className="text-xs text-muted-foreground">Received entries</p>
+                <p className="mt-1 font-semibold">{data?.usd.filter((entry) => entry.direction === 'INCOMING').length || 0}</p>
+              </div>
+              <div className="rounded-md bg-muted/60 p-3">
+                <p className="text-xs text-muted-foreground">Payment entries</p>
+                <p className="mt-1 font-semibold">{data?.npr.filter((entry) => entry.direction === 'OUTGOING').length || 0}</p>
+              </div>
+              <div className="rounded-md bg-muted/60 p-3">
+                <p className="text-xs text-muted-foreground">Party ledger net (NPR)</p>
+                <p className="mt-1 font-semibold">{formatNPR(Math.abs(summary.partyOutgoingNpr - summary.partyIncomingNpr))}</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
+              <Button variant="ghost" size="sm" asChild>
+                <Link to={`/receivable-payable${queryString ? `?${queryString}` : ''}`} onClick={() => onOpenChange(false)}>
+                  NPR Details <ExternalLink className="ml-2 h-3.5 w-3.5" />
+                </Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link to={`/transactions${queryString ? `?${queryString}` : ''}`} onClick={() => onOpenChange(false)}>
+                  USD Details <ExternalLink className="ml-2 h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
