@@ -50,7 +50,7 @@ export default function Dashboard() {
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
   
-  const { isAdmin } = useUserRole();
+  const { isAdmin, isEditor } = useUserRole();
   const { isVisible: showSensitive, MASK } = useSensitiveDataVisibility();
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
   const { data: walletSummary, isLoading: walletLoading } = usePaypalSummary();
@@ -267,7 +267,7 @@ export default function Dashboard() {
                 <StatCard 
                   title={`Profit (${getDateFilterLabel()})`}
                   value={showSensitive ? `NPR ${Math.round(profitMetrics?.profitNpr || 0).toLocaleString()}` : MASK} 
-                  subtitle={showSensitive ? (profitMetrics?.weightedAvgIncomingRate === 0 ? 'N/A - No incoming data' : `Avg Rate: ${profitMetrics?.weightedAvgOutgoingRate.toFixed(2)} - ${profitMetrics?.weightedAvgIncomingRate.toFixed(2)}`) : ''}
+                  subtitle={showSensitive || isEditor ? (profitMetrics?.weightedAvgIncomingRate === 0 ? 'N/A - No incoming data' : `Avg Rate: ${profitMetrics?.weightedAvgOutgoingRate.toFixed(2)} - ${profitMetrics?.weightedAvgIncomingRate.toFixed(2)}`) : ''}
                   icon={<TrendingUp className="h-5 w-5 text-success" />} 
                   variant={profitMetrics?.profitNpr && profitMetrics.profitNpr > 0 ? 'default' : 'default'}
                 />

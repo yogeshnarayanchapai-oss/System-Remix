@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 
 export function GlobalSensitiveToggle() {
-  const { toggle, verifyPin, toggleState, isRoleLoading, isAdmin } = useSensitiveData();
+  const { toggle, verifyPin, toggleState, isRoleLoading, isAdmin, isPinVerified } = useSensitiveData();
   const [showPinDialog, setShowPinDialog] = useState(false);
   const [pin, setPin] = useState('');
 
@@ -21,9 +21,14 @@ export function GlobalSensitiveToggle() {
       // Currently visible → hide (no PIN needed)
       toggle();
     } else if (isAdmin) {
-      // Currently hidden & admin → ask for PIN
-      setPin('');
-      setShowPinDialog(true);
+      if (isPinVerified) {
+        // The PIN remains valid for 24 hours.
+        toggle();
+      } else {
+        // Currently hidden & admin → ask for PIN
+        setPin('');
+        setShowPinDialog(true);
+      }
     } else {
       // Editor → show restricted message
       toggle();
