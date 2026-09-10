@@ -8,7 +8,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { useDaybook } from '@/hooks/useDaybook';
-import { formatNPR, formatUSD } from '@/lib/format';
 
 interface DaybookModalProps {
   open: boolean;
@@ -91,10 +90,9 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
   }, [currency, data]);
 
   const query = new URLSearchParams();
-  if (dateFrom) query.set('dateFrom', dateFrom);
-  if (dateTo) query.set('dateTo', dateTo);
+  query.set('dateFrom', selectedDate);
+  query.set('dateTo', selectedDate);
   const queryString = query.toString();
-  const formatAmount = (amount: number) => currency === 'NPR' ? formatNPR(amount) : formatUSD(amount);
   const nextCurrency: Currency = currency === 'NPR' ? 'USD' : 'NPR';
   const partyBalanceLabel = summary.partyNet > 0 ? 'Receivable' : summary.partyNet < 0 ? 'Payable' : 'Settled';
 
