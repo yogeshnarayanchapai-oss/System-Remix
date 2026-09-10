@@ -356,8 +356,6 @@ export default function Dashboard() {
         <DaybookModal
           open={showDaybook}
           onOpenChange={setShowDaybook}
-          dateFrom={dateFilter.startDate}
-          dateTo={dateFilter.endDate}
         />
       )}
       <TransferModal open={showTransferModal} onOpenChange={setShowTransferModal} />
