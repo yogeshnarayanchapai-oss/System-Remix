@@ -1,0 +1,613 @@
+Add a new ADMIN-ONLY “Daybook” feature to the existing system.
+
+IMPORTANT:
+- This is an addition to the existing system.
+- Do NOT change any existing transaction business logic, permissions, RLS behavior, transfer logic, accounting rules, or existing pages.
+- Reuse the current transaction tables, transaction types, status values, user/account references, and existing services/hooks wherever possible.
+- First inspect the existing transaction/accounting structure and map the Daybook to the current data model instead of creating duplicate transaction data.
+- This feature must be visible and accessible ONLY to Admin users.
+
+====================================================
+1. DASHBOARD BUTTON
+====================================================
+
+On the Admin Dashboard:
+
+- Find the existing “Transfer” button.
+- Add a new button immediately to the LEFT of the Transfer button.
+
+Button:
+Daybook
+
+Suggested icon:
+BookOpen / Notebook / Receipt icon
+
+This button must only be rendered for Admin role.
+
+When clicked:
+- Open Daybook inside a modal/popup.
+- Do NOT navigate away from the dashboard initially.
+
+====================================================
+2. DAYBOOK POPUP / MODAL
+====================================================
+
+Create a clean responsive Daybook modal similar to a daily accounting book.
+
+Header:
+
+Daybook
+
+Show:
+Date: [Selected Date]
+
+Default date:
+Today
+
+Also allow:
+- Previous date
+- Next date
+- Date picker
+
+At the top-right add currency switch:
+
+[NPR] [USD]
+
+DEFAULT:
+NPR
+
+Every time the modal opens:
+- Start in NPR mode by default.
+
+====================================================
+3. NPR / USD MODE
+====================================================
+
+The Daybook must work independently for NPR and USD transactions.
+
+NPR MODE:
+- Read only relevant NPR transactions from the existing transaction system.
+- Show NPR received transactions on the left.
+- Show NPR payment/sent transactions on the right.
+
+USD MODE:
+- Read only relevant USD transactions from the existing transaction system.
+- Show USD received transactions on the left.
+- Show USD payment/sent transactions on the right.
+
+Do NOT convert NPR into USD or USD into NPR for this Daybook.
+
+Each mode must show actual transactions stored in that currency.
+
+====================================================
+4. DAYBOOK TABLE UI
+====================================================
+
+Use a side-by-side layout similar to this:
+
+----------------------------------------------------
+                DAYBOOK
+Date: 10 Sep 2026              [NPR | USD]
+----------------------------------------------------
+
+RECEIVED                         PAYMENT
+----------------------------------------------------
+Particular       Amount          Particular       Amount
+----------------------------------------------------
+Received from X  100,000         Sent to Raz      50,000
+Received from Y   20,000         Office Expense    5,000
+...
+
+----------------------------------------------------
+TOTAL RECEIVED   120,000         TOTAL PAYMENT     55,000
+----------------------------------------------------
+
+Keep both sides aligned row-by-row visually.
+
+If one side contains more rows:
+- Leave the opposite cells blank.
+- Do not distort the table.
+
+Desktop:
+Two-column Received / Payment layout.
+
+Mobile:
+Responsive layout, but keep Received and Payment clearly separated.
+
+====================================================
+5. PARTICULAR / DESCRIPTION
+====================================================
+
+For each transaction, show the most useful available transaction description.
+
+Examples:
+
+Received:
+- Received from @todd
+- Received from NCM
+- Received from Client A
+- Received from XYZ Account
+
+Payment:
+- Sent to Raz from @ync
+- Office expense
+- Supplier payment
+- Transfer to XYZ
+
+Reuse existing transaction:
+- description
+- remarks
+- party/account name
+- sender
+- receiver
+- created_by
+- reference
+etc.
+
+Do NOT invent values.
+
+Use whichever existing fields represent the transaction correctly.
+
+====================================================
+6. WHAT COUNTS AS RECEIVED / PAYMENT
+====================================================
+
+Do not create a new accounting interpretation.
+
+Inspect the existing transaction system and determine how it currently identifies:
+
+- incoming / received / credit
+- outgoing / payment / sent / debit
+
+Use the SAME existing transaction direction/type logic.
+
+Examples only:
+
+Incoming / Credit / Receive
+=> Received side
+
+Outgoing / Debit / Send / Payment
+=> Payment side
+
+Ignore:
+- cancelled transactions
+- deleted transactions
+- failed transactions
+- draft transactions
+
+ONLY if the existing system already excludes those states.
+
+Use the same final/approved transaction rules already used elsewhere in the system.
+
+====================================================
+7. TOTAL CALCULATION
+====================================================
+
+At the bottom calculate:
+
+TOTAL RECEIVED
+= sum of all valid Received transactions for selected date + selected currency
+
+TOTAL PAYMENT
+= sum of all valid Payment transactions for selected date + selected currency
+
+These calculations should happen server-side/database-side where possible.
+
+Do NOT download thousands of transactions and calculate everything in JavaScript.
+
+Use:
+SUM()
+or an RPC/server-side aggregate/query.
+
+====================================================
+8. RECEIVABLE / PAYABLE BALANCE SUMMARY
+====================================================
+
+Below the totals add a small Summary section.
+
+Example:
+
+------------------------------------------
+Summary
+------------------------------------------
+Total Received       Rs. 120,000
+Total Payment        Rs. 100,000
+
+Receivable           Rs. 20,000
+Payable              Rs. 0
+------------------------------------------
+
+For USD:
+
+Total Received       $1,000
+Total Payment        $750
+
+Receivable           $250
+Payable              $0
+
+For the Daybook balance calculation:
+
+Net Balance =
+Total Received - Total Payment
+
+If Net Balance > 0:
+Receivable = Net Balance
+Payable = 0
+
+If Net Balance < 0:
+Receivable = 0
+Payable = ABS(Net Balance)
+
+If Net Balance = 0:
+Receivable = 0
+Payable = 0
+
+Display a short human-readable line:
+
+If Receivable:
+“To Receive: Rs. 20,000”
+
+If Payable:
+“To Pay: Rs. 20,000”
+
+If zero:
+“Settled”
+
+For USD use:
+“To Receive: $250”
+or
+“To Pay: $250”
+
+IMPORTANT:
+If the existing accounting system already has a more accurate receivable/payable ledger calculation, USE THAT EXISTING LOGIC instead of this simple net calculation.
+
+The goal is to display the correct current receivable/payable balance without changing existing accounting behavior.
+
+====================================================
+9. VIEW MORE BUTTON
+====================================================
+
+At the bottom of the Daybook popup add:
+
+[View More]
+
+Behavior depends on the CURRENT currency mode.
+
+If Daybook is in NPR mode:
+View More should open the existing relevant NPR Transaction / Accounting page.
+
+If Daybook is in USD mode:
+View More should open the existing relevant USD Transaction / Accounting page.
+
+Pass the selected currency as query/filter state.
+
+Examples:
+
+/admin/transactions?currency=NPR
+
+/admin/transactions?currency=USD
+
+If the system already has separate pages/routes for NPR and USD transactions, use those existing routes instead.
+
+Also pass selected date when possible:
+
+?currency=NPR&date=2026-09-10
+
+On the destination page:
+- automatically apply that currency filter
+- optionally apply selected date
+- show the detailed transactions related to the Daybook
+
+Do not create a duplicate transaction page if an existing suitable page already exists.
+
+====================================================
+10. MODAL ACTIONS
+====================================================
+
+Modal footer:
+
+[View More]        [Close]
+
+View More:
+Open related transaction page.
+
+Close:
+Close modal and stay on Dashboard.
+
+====================================================
+11. LOADING / EMPTY / ERROR STATES
+====================================================
+
+Loading:
+Show skeleton/loading state.
+
+No transactions:
+
+“No NPR transactions found for this date.”
+
+or
+
+“No USD transactions found for this date.”
+
+Still show:
+
+Total Received = 0
+Total Payment = 0
+Receivable = 0
+Payable = 0
+
+Error:
+Show clean inline error message with Retry button.
+
+Do not break the Dashboard.
+
+====================================================
+12. ADMIN ONLY SECURITY
+====================================================
+
+This must NOT be only frontend-hidden.
+
+Protect this feature at all levels.
+
+Requirements:
+
+- Dashboard Daybook button => Admin only
+- Daybook modal data query => Admin only
+- Daybook summary API/RPC => Admin only
+- View More transaction route => respect existing Admin permissions
+- Direct URL/API access by non-admin must fail
+
+Reuse existing Admin authorization system.
+
+Do NOT weaken or remove existing RLS/security policies.
+
+====================================================
+13. PERFORMANCE
+====================================================
+
+Do not load all historical transactions.
+
+For popup Daybook:
+
+Query only:
+
+selected_date
++
+selected_currency
++
+valid transaction status
+
+Example:
+
+WHERE transaction_date = selectedDate
+AND currency = selectedCurrency
+
+Use indexed fields where appropriate.
+
+For totals:
+Use server-side aggregation.
+
+For transaction rows:
+Return only that day's data.
+
+If there can be a very large number of daily transactions:
+Initially show around 10–20 Received and 10–20 Payment entries in the popup.
+
+The total calculation must still include ALL valid transactions of that day.
+
+“View More” shows full/paginated transaction data.
+
+====================================================
+14. UI STYLE
+====================================================
+
+Match the existing Admin Dashboard design system.
+
+Do not create an unrelated visual style.
+
+Daybook should feel like part of the current application.
+
+Recommended:
+
+Header:
+Daybook                         NPR | USD
+
+Date navigation below.
+
+Received header:
+Green/positive style only if consistent with current UI.
+
+Payment:
+Red/outgoing style only if consistent with current UI.
+
+Totals should be bold.
+
+Summary card should be compact.
+
+Receivable:
+clearly visible
+
+Payable:
+clearly visible
+
+But keep the popup clean and compact.
+
+====================================================
+15. COMPONENT SUGGESTION
+====================================================
+
+Reuse existing architecture, but preferred structure:
+
+AdminDashboard
+  └── DaybookButton
+
+DaybookModal
+  ├── DaybookHeader
+  ├── CurrencyToggle
+  ├── DateSelector
+  ├── DaybookTable
+  │    ├── ReceivedList
+  │    └── PaymentList
+  ├── DaybookTotals
+  ├── BalanceSummary
+  └── ViewMoreButton
+
+Possible hook/service:
+
+useDaybook({
+  date,
+  currency
+})
+
+Response shape can be similar to:
+
+{
+  date: "2026-09-10",
+  currency: "NPR",
+
+  received: [
+    {
+      id,
+      particular,
+      amount,
+      createdAt
+    }
+  ],
+
+  payments: [
+    {
+      id,
+      particular,
+      amount,
+      createdAt
+    }
+  ],
+
+  summary: {
+    totalReceived,
+    totalPayment,
+    netBalance,
+    receivable,
+    payable
+  }
+}
+
+====================================================
+16. IMPORTANT DATA RULE
+====================================================
+
+Daybook is a VIEW of the existing transaction system.
+
+It must NOT:
+
+- create duplicate transactions
+- modify transaction amounts
+- move transactions
+- change statuses
+- change currency
+- alter ledger balances
+
+It is only a reporting/view feature.
+
+====================================================
+17. DATE HANDLING
+====================================================
+
+Use the application's existing timezone/date handling.
+
+For daily Daybook:
+Use the business/local date boundary currently used by the system.
+
+Do not accidentally group transactions by UTC date if the existing system uses Nepal/local business time.
+
+Make sure a transaction created near midnight appears under the correct business date.
+
+====================================================
+18. FINAL EXPECTED FLOW
+====================================================
+
+Admin Dashboard
+
+Daybook     Transfer
+   ↓
+
+Click Daybook
+
+Popup:
+
+------------------------------------------------
+Daybook                         [NPR] [USD]
+
+10 Sep 2026
+
+Received                    Payment
+------------------------------------------------
+ABC            50,000       Raz           20,000
+NCM           100,000       Supplier      30,000
+------------------------------------------------
+Total         150,000       Total         50,000
+
+Summary
+
+Receivable: 100,000
+Payable: 0
+
+To Receive: Rs. 100,000
+
+                [View More] [Close]
+------------------------------------------------
+
+Switch to USD:
+
+Received                    Payment
+------------------------------------------------
+@todd           $100        Raz             $50
+Client           $200       Hosting          $20
+------------------------------------------------
+Total            $300       Total            $70
+
+Receivable: $230
+Payable: $0
+
+To Receive: $230
+
+[View More]
+
+Click View More:
+Open transaction details filtered to USD.
+
+====================================================
+19. DO NOT CHANGE
+====================================================
+
+Do not change:
+
+- existing Transfer feature
+- transaction creation
+- transaction editing
+- permissions of other modules
+- account balances
+- existing dashboard statistics
+- RLS behavior
+- transaction status workflow
+- other user roles
+
+Only add this Admin Daybook feature.
+
+====================================================
+20. BEFORE CODING
+====================================================
+
+First audit and report:
+
+1. Which existing transaction table/table(s) will be used.
+2. Which field stores currency.
+3. Which field identifies Received vs Payment.
+4. Which statuses count as completed/valid.
+5. Which existing route should be used for “View More”.
+6. Which role/permission mechanism identifies Admin.
+7. Whether an existing receivable/payable calculation already exists.
+
+Then implement the feature using those existing structures.
+
+Do not create unnecessary duplicate tables or duplicate accounting logic.
