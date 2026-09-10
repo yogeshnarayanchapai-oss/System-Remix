@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   Scale, 
   ArrowDownLeft, 
@@ -27,6 +28,7 @@ import { TransactionsTab } from '@/components/receivable-payable/TransactionsTab
 import { NprTransfersTab } from '@/components/receivable-payable/NprTransfersTab';
 
 export default function ReceivablePayable() {
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [hideZeroBalance, setHideZeroBalance] = useState(true);
   const [viewLedger, setViewLedger] = useState<PartySummary | null>(null);
@@ -234,7 +236,11 @@ export default function ReceivablePayable() {
         </TabsContent>
 
         <TabsContent value="transactions">
-          <TransactionsTab onViewParty={handleViewParty} />
+          <TransactionsTab
+            onViewParty={handleViewParty}
+            initialDateFrom={searchParams.get('dateFrom') || undefined}
+            initialDateTo={searchParams.get('dateTo') || undefined}
+          />
         </TabsContent>
 
         <TabsContent value="transfers">

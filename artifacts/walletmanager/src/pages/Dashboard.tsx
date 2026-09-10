@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowDownLeft, ArrowUpRight, Wallet, TrendingUp, Calendar, CreditCard, ChevronRight, Mail, Users, Scale, Eye, ArrowUpDown, Layers, ArrowRightLeft, Check, MailX, DollarSign, TrendingDown, Banknote, Settings } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Wallet, TrendingUp, Calendar, CreditCard, ChevronRight, Mail, Users, Scale, Eye, ArrowUpDown, Layers, ArrowRightLeft, Check, MailX, DollarSign, TrendingDown, Banknote, Settings, BookOpen } from 'lucide-react';
 import { format } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -30,6 +30,7 @@ import { TransferModal } from '@/components/transfers/TransferModal';
 import { PartyLedgerModal } from '@/components/party/PartyLedgerModal';
 import { NepaliAccountSelect } from '@/components/nepali-accounts/NepaliAccountSelect';
 import { SettingsModal } from '@/components/settings/SettingsModal';
+import { DaybookModal } from '@/components/daybook/DaybookModal';
 import { PartySummary } from '@/lib/types';
 
 type SortBy = 'recent' | 'total' | 'unsettled';
@@ -41,6 +42,7 @@ export default function Dashboard() {
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showDaybook, setShowDaybook] = useState(false);
   const [viewLedger, setViewLedger] = useState<PartySummary | null>(null);
   const [settlingParty, setSettlingParty] = useState<PartySummary | null>(null);
   const [settleNepaliAccountId, setSettleNepaliAccountId] = useState<string | null>(null);
@@ -128,6 +130,11 @@ export default function Dashboard() {
           <Button variant="outline" size="sm" onClick={() => setShowSettingsModal(true)} title="Settings">
             <Settings className="h-4 w-4" />
           </Button>
+          {isAdmin && (
+            <Button variant="outline" onClick={() => setShowDaybook(true)}>
+              <BookOpen className="mr-2 h-4 w-4" />Daybook
+            </Button>
+          )}
           <Button variant="outline" onClick={() => setShowTransferModal(true)}><ArrowRightLeft className="mr-2 h-4 w-4" />Transfer</Button>
           <Button onClick={() => setShowBulkModal(true)}><Layers className="mr-2 h-4 w-4" />Bulk Transaction</Button>
         </div>}
@@ -345,6 +352,14 @@ export default function Dashboard() {
       </Card>
 
       <BulkTransactionModal open={showBulkModal} onOpenChange={setShowBulkModal} />
+      {isAdmin && (
+        <DaybookModal
+          open={showDaybook}
+          onOpenChange={setShowDaybook}
+          dateFrom={dateFilter.startDate}
+          dateTo={dateFilter.endDate}
+        />
+      )}
       <TransferModal open={showTransferModal} onOpenChange={setShowTransferModal} />
       <PartyLedgerModal party={viewLedger} open={!!viewLedger} onOpenChange={() => setViewLedger(null)} />
       

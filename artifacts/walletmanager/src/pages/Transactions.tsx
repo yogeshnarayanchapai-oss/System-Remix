@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -50,14 +51,23 @@ import { BulkTransactionModal } from '@/components/transactions/BulkTransactionM
 import { TransferModal } from '@/components/transfers/TransferModal';
 
 export default function Transactions() {
+  const [searchParams] = useSearchParams();
+  const initialDateFrom = searchParams.get('dateFrom');
+  const initialDateTo = searchParams.get('dateTo');
   const [activeTab, setActiveTab] = useState('transactions');
   const [txnSubTab, setTxnSubTab] = useState<'incoming' | 'outgoing'>('incoming');
   const [search, setSearch] = useState('');
   const [walletFilter, setWalletFilter] = useState<string>('ALL');
   const [partyFilter, setPartyFilter] = useState<string>('ALL');
-  const [datePreset, setDatePreset] = useState<'today' | '7days' | '30days' | 'custom'>('today');
-  const [customDateFrom, setCustomDateFrom] = useState<Date | undefined>(undefined);
-  const [customDateTo, setCustomDateTo] = useState<Date | undefined>(undefined);
+  const [datePreset, setDatePreset] = useState<'today' | '7days' | '30days' | 'custom'>(
+    initialDateFrom || initialDateTo ? 'custom' : 'today',
+  );
+  const [customDateFrom, setCustomDateFrom] = useState<Date | undefined>(
+    initialDateFrom ? new Date(`${initialDateFrom}T00:00:00`) : undefined,
+  );
+  const [customDateTo, setCustomDateTo] = useState<Date | undefined>(
+    initialDateTo ? new Date(`${initialDateTo}T00:00:00`) : undefined,
+  );
 
   const dateFilters = useMemo(() => {
     const today = format(new Date(), 'yyyy-MM-dd');

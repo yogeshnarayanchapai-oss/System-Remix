@@ -27,13 +27,21 @@ import { toast } from 'sonner';
 
 interface TransactionsTabProps {
   onViewParty?: (party: PartySummary) => void;
+  initialDateFrom?: string;
+  initialDateTo?: string;
 }
 
-export function TransactionsTab({ onViewParty }: TransactionsTabProps) {
+export function TransactionsTab({ onViewParty, initialDateFrom, initialDateTo }: TransactionsTabProps) {
   // Filter states
-  const [dateQuickFilter, setDateQuickFilter] = useState<DateQuickFilter>('7days');
-  const [customFromDate, setCustomFromDate] = useState<Date | undefined>(undefined);
-  const [customToDate, setCustomToDate] = useState<Date | undefined>(undefined);
+  const [dateQuickFilter, setDateQuickFilter] = useState<DateQuickFilter>(
+    initialDateFrom || initialDateTo ? 'custom' : '7days',
+  );
+  const [customFromDate, setCustomFromDate] = useState<Date | undefined>(
+    initialDateFrom ? new Date(`${initialDateFrom}T00:00:00`) : undefined,
+  );
+  const [customToDate, setCustomToDate] = useState<Date | undefined>(
+    initialDateTo ? new Date(`${initialDateTo}T00:00:00`) : undefined,
+  );
   const [selectedPartyId, setSelectedPartyId] = useState<string>('');
   const [selectedNprAccountId, setSelectedNprAccountId] = useState<string>('all');
   const [remarkSearch, setRemarkSearch] = useState('');
