@@ -1,1 +1,2 @@
 - [Wallet Manager dev binding](walletmanager-dev-binding.md) — this environment may not support IPv6 `::`; bind the Vite middleware server to IPv4.
+- [Daybook metric scopes](daybook-metric-scopes.md) — date activity totals and global party outstanding balances must remain separate.

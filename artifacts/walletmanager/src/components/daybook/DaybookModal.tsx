@@ -19,13 +19,6 @@ function formatWhole(value: number) {
   return Math.round(value).toLocaleString('en-US');
 }
 
-function formatExact(value: number) {
-  return Math.abs(value).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
 export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
   const [currency, setCurrency] = useState<Currency>('NPR');
   const [detailsMode, setDetailsMode] = useState<Currency | null>(null);
@@ -243,9 +236,9 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
                 </div>
                 {currency === 'NPR' && (
                   <div className="flex items-center justify-between gap-3 rounded-md px-3 py-2.5">
-                    <span className="text-muted-foreground">Exact Receivable / Payable</span>
+                    <span className="text-muted-foreground">Exact R/P</span>
                     <span className={`font-semibold ${exactPartyBalance >= 0 ? 'text-success' : 'text-outgoing'}`}>
-                      {formatExact(exactPartyBalance)} {partyBalanceLabel}
+                      {formatWhole(exactPartyBalance)} {partyBalanceLabel}
                     </span>
                   </div>
                 )}
