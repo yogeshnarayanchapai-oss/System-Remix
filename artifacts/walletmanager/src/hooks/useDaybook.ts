@@ -96,6 +96,30 @@ export function useDaybook({ dateFrom, dateTo, enabled = true }: DaybookFilters 
       if (nprError) throw nprError;
       if (transferError) throw transferError;
 
+      const allPartyTransactions: Array<{ entry_type: string; amount_npr: number }> = [];
+      let partyPageFrom = 0;
+      const partyPageSize = 1000;
+
+      while (true) {
+        const { data: partyBatch, error: partyBalanceError } = await supabase
+          .from('party_transactions')
+          .select('entry_type, amount_npr')
+          .range(partyPageFrom, partyPageFrom + partyPageSize - 1);
+
+        if (partyBalanceError) throw partyBalanceError;
+        if (!partyBatch || partyBatch.length === 0) break;
+
+        allPartyTransactions.push(...partyBatch);
+        if (partyBatch.length < partyPageSize) break;
+        partyPageFrom += partyPageSize;
+      }
+
+      const partyBalanceNpr = allPartyTransactions.reduce((balance, entry) => (
+        entry.entry_type === 'OUTGOING'
+          ? balance + (Number(entry.amount_npr) || 0)
+          : balance - (Number(entry.amount_npr) || 0)
+      ), 0);
+
       return {
         usd: ((usdData || []) as any[]).map((entry): DaybookUsdEntry => ({
           id: entry.id,
@@ -117,6 +141,7 @@ export function useDaybook({ dateFrom, dateTo, enabled = true }: DaybookFilters 
           remark: entry.remark,
         })),
         transferCount: transferCount || 0,
+        partyBalanceNpr,
       };
     },
   });

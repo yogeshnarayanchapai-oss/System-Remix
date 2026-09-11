@@ -19,6 +19,13 @@ function formatWhole(value: number) {
   return Math.round(value).toLocaleString('en-US');
 }
 
+function formatExact(value: number) {
+  return Math.abs(value).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
   const [currency, setCurrency] = useState<Currency>('NPR');
   const [detailsMode, setDetailsMode] = useState<Currency | null>(null);
@@ -70,7 +77,8 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
     return { ...totals, averageRate, received, payment, netBalance, partyNet };
   }, [currency, data]);
 
-  const partyBalanceLabel = summary.partyNet > 0 ? 'Receivable' : summary.partyNet < 0 ? 'Payable' : 'Settled';
+  const exactPartyBalance = data?.partyBalanceNpr || 0;
+  const partyBalanceLabel = exactPartyBalance > 0 ? 'Receivable' : exactPartyBalance < 0 ? 'Payable' : 'Settled';
   const nextCurrency: Currency = currency === 'NPR' ? 'USD' : 'NPR';
   const receivedCount = currency === 'NPR'
     ? data?.npr.filter((entry) => entry.direction === 'INCOMING').length || 0
@@ -236,8 +244,8 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
                 {currency === 'NPR' && (
                   <div className="flex items-center justify-between gap-3 rounded-md px-3 py-2.5">
                     <span className="text-muted-foreground">Exact Receivable / Payable</span>
-                    <span className={`font-semibold ${summary.partyNet >= 0 ? 'text-success' : 'text-outgoing'}`}>
-                      {formatWhole(Math.abs(summary.partyNet))} {partyBalanceLabel}
+                    <span className={`font-semibold ${exactPartyBalance >= 0 ? 'text-success' : 'text-outgoing'}`}>
+                      {formatExact(exactPartyBalance)} {partyBalanceLabel}
                     </span>
                   </div>
                 )}
