@@ -244,17 +244,17 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 border-t pt-2">
+            <div className="flex flex-col gap-2 border-t pt-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="grid min-w-0 flex-1 grid-cols-3 gap-1 text-[10px] text-muted-foreground sm:text-[11px]">
                 <span className="min-w-0 truncate rounded bg-muted px-1 py-1 text-center whitespace-nowrap">{receivedCountLabel}: <strong className="text-foreground">{receivedCount}</strong></span>
                 <span className="min-w-0 truncate rounded bg-muted px-1 py-1 text-center whitespace-nowrap">{paymentCountLabel}: <strong className="text-foreground">{paymentCount}</strong></span>
                 <span className="min-w-0 truncate rounded bg-muted px-1 py-1 text-center whitespace-nowrap">Avg Rate: <strong className="text-foreground">{formatWhole(summary.averageRate)}</strong></span>
               </div>
-              <div className="grid shrink-0 grid-cols-2 gap-1 sm:flex">
-                <Button variant="outline" size="sm" className="h-7 px-1.5 text-[10px] sm:h-8 sm:px-2 sm:text-xs" onClick={() => setDetailsMode('NPR')}>
+              <div className="grid w-full grid-cols-2 gap-1.5 sm:w-auto sm:flex">
+                <Button variant="outline" size="sm" className="h-8 whitespace-nowrap px-2 text-xs" onClick={() => setDetailsMode('NPR')}>
                   NPR Details
                 </Button>
-                <Button variant="outline" size="sm" className="h-7 px-1.5 text-[10px] sm:h-8 sm:px-2 sm:text-xs" onClick={() => setDetailsMode('USD')}>
+                <Button variant="outline" size="sm" className="h-8 whitespace-nowrap px-2 text-xs" onClick={() => setDetailsMode('USD')}>
                   USD Details
                 </Button>
               </div>
