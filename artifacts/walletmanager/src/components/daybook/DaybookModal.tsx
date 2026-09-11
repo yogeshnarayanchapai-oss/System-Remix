@@ -225,10 +225,6 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
                   <span className="text-xs font-medium text-muted-foreground">Transfers</span>
                   <span className="text-sm font-bold text-primary">{data?.transferCount || 0}</span>
                 </div>
-                <div className="flex h-9 items-center justify-between gap-2 rounded-md bg-muted/60 px-2.5">
-                  <span className="text-xs font-medium text-muted-foreground">Average Rate</span>
-                  <span className="text-sm font-bold">{formatWhole(summary.averageRate)}</span>
-                </div>
               </div>
               <div className="grid gap-2 border-t bg-muted/20 p-3 text-sm sm:grid-cols-2 sm:p-4">
                 <div className="flex items-center justify-between gap-3 rounded-md bg-primary/10 px-3 py-2.5 font-bold">
@@ -252,6 +248,7 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
               <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
                 <span className="rounded bg-muted px-2 py-1">{receivedCountLabel}: <strong className="text-foreground">{receivedCount}</strong></span>
                 <span className="rounded bg-muted px-2 py-1">{paymentCountLabel}: <strong className="text-foreground">{paymentCount}</strong></span>
+                <span className="rounded bg-muted px-2 py-1">Average Rate: <strong className="text-foreground">{formatWhole(summary.averageRate)}</strong></span>
               </div>
               <div className="grid grid-cols-2 gap-1.5 sm:flex">
                 <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => setDetailsMode('NPR')}>
