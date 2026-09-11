@@ -126,17 +126,17 @@ export default function Dashboard() {
   return (
     <AppLayout>
       <PageHeader title="Dashboard" description="Overview of all wallet accounts and transactions"
-        actions={<div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setShowSettingsModal(true)} title="Settings">
+        actions={<div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
+          <Button variant="outline" size="sm" className="min-w-0" onClick={() => setShowSettingsModal(true)} title="Settings">
             <Settings className="h-4 w-4" />
           </Button>
           {isAdmin && (
-            <Button variant="outline" onClick={() => setShowDaybook(true)}>
+            <Button variant="outline" size="sm" className="min-w-0" onClick={() => setShowDaybook(true)}>
               <BookOpen className="mr-2 h-4 w-4" />Daybook
             </Button>
           )}
-          <Button variant="outline" onClick={() => setShowTransferModal(true)}><ArrowRightLeft className="mr-2 h-4 w-4" />Transfer</Button>
-          <Button onClick={() => setShowBulkModal(true)}><Layers className="mr-2 h-4 w-4" />Bulk Transaction</Button>
+          <Button variant="outline" size="sm" className="min-w-0" onClick={() => setShowTransferModal(true)}><ArrowRightLeft className="mr-2 h-4 w-4" />Transfer</Button>
+          <Button size="sm" className="min-w-0" onClick={() => setShowBulkModal(true)}><Layers className="mr-2 h-4 w-4" />Bulk Transaction</Button>
         </div>}
       />
 
