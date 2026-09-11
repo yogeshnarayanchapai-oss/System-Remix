@@ -138,55 +138,54 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[calc(100%-1rem)] max-w-3xl overflow-hidden p-4 sm:p-6">
         <DialogHeader>
-          <div className="flex items-start justify-between gap-2 pr-7">
+          <div className="flex flex-col gap-3 pr-7 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
                 <BookOpen className="h-5 w-5 shrink-0 text-primary" />
                 {detailsMode ? `${detailsMode} Details` : 'Daybook'}
               </DialogTitle>
-              <DialogDescription className="mt-1">
+              <DialogDescription className="sr-only">
                 {detailsMode ? `Read-only entries for ${selectedDateLabel}` : `One-day report for ${selectedDateLabel}`}
               </DialogDescription>
             </div>
-            {!detailsMode && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0"
-                onClick={() => setCurrency(nextCurrency)}
-                title={`Switch to ${nextCurrency}`}
-              >
-                {currency}<ArrowLeftRight className="ml-1.5 h-3.5 w-3.5" />
+            <div className="flex w-full items-center gap-1 sm:w-auto sm:gap-2">
+              <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => moveDate(-1)} title="Previous day">
+                <ChevronLeft className="h-4 w-4" />
               </Button>
-            )}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="min-w-0 flex-1 gap-2 sm:flex-none">
+                    <CalendarDays className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{selectedDateLabel}</span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="center">
+                  <CalendarComponent
+                    mode="single"
+                    selected={selectedDateObject}
+                    onSelect={chooseDate}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+              <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => moveDate(1)} title="Next day">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              {!detailsMode && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => setCurrency(nextCurrency)}
+                  title={`Switch to ${nextCurrency}`}
+                >
+                  {currency}<ArrowLeftRight className="ml-1.5 h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
           </div>
         </DialogHeader>
-
-        <div className="flex items-center justify-between gap-2 rounded-lg border bg-muted/30 p-2">
-          <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => moveDate(-1)} title="Previous day">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="min-w-0 flex-1 gap-2">
-                <CalendarDays className="h-4 w-4 shrink-0" />
-                <span className="truncate">{selectedDateLabel}</span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="center">
-              <CalendarComponent
-                mode="single"
-                selected={selectedDateObject}
-                onSelect={chooseDate}
-                initialFocus
-                className="pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
-          <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => moveDate(1)} title="Next day">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
 
         {isLoading ? (
           <div className="space-y-4 py-4">
@@ -200,45 +199,40 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
           renderDetails(detailsMode)
         ) : (
           <div className="max-h-[62vh] space-y-3 overflow-y-auto pr-1 sm:space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-lg border-l-4 border-success bg-success/10 p-3 sm:p-4">
-                <p className="text-xs font-medium text-muted-foreground sm:text-sm">Total Received ({currency})</p>
-                <p className="mt-1 text-xl font-bold text-success sm:text-2xl">{formatWhole(summary.received)}</p>
-                {currency === 'NPR' && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {formatWhole(summary.receivedUsd)} received × average rate {formatWhole(summary.averageRate)}
-                  </p>
-                )}
-              </div>
-              <div className="rounded-lg border-l-4 border-outgoing bg-outgoing/10 p-3 sm:p-4">
-                <p className="text-xs font-medium text-muted-foreground sm:text-sm">Total Payment ({currency})</p>
-                <p className="mt-1 text-xl font-bold text-outgoing sm:text-2xl">{formatWhole(summary.payment)}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {currency === 'NPR' ? 'Outgoing party ledger total' : 'Outgoing USD transaction total'}
-                </p>
-              </div>
-            </div>
-
             <div className="overflow-hidden rounded-lg border">
               <div className="grid grid-cols-2 bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground sm:px-4 sm:py-3">
                 <span>Daybook Summary</span>
                 <span className="text-right">{currency}</span>
               </div>
-              <div className="divide-y text-sm">
-                <div className="grid grid-cols-2 px-3 py-2.5 sm:px-4 sm:py-3">
-                  <span className="text-muted-foreground">Average rate</span>
-                  <span className="text-right font-semibold">{formatWhole(summary.averageRate)}</span>
+              <div className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4">
+                <div className="rounded-lg border-l-4 border-success bg-success/10 p-3">
+                  <p className="text-xs font-medium text-muted-foreground sm:text-sm">Total Received ({currency})</p>
+                  <p className="mt-1 text-xl font-bold text-success sm:text-2xl">{formatWhole(summary.received)}</p>
+                  {currency === 'NPR' && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {formatWhole(summary.receivedUsd)} received × average rate {formatWhole(summary.averageRate)}
+                    </p>
+                  )}
                 </div>
-                <div className="grid grid-cols-2 bg-primary/10 px-3 py-3 text-base font-bold sm:px-4 sm:text-lg">
+                <div className="rounded-lg border-l-4 border-outgoing bg-outgoing/10 p-3">
+                  <p className="text-xs font-medium text-muted-foreground sm:text-sm">Total Payment ({currency})</p>
+                  <p className="mt-1 text-xl font-bold text-outgoing sm:text-2xl">{formatWhole(summary.payment)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {currency === 'NPR' ? 'Outgoing party ledger total' : 'Outgoing USD transaction total'}
+                  </p>
+                </div>
+              </div>
+              <div className="grid gap-2 border-t bg-muted/20 p-3 text-sm sm:grid-cols-2 sm:p-4">
+                <div className="flex items-center justify-between gap-3 rounded-md bg-primary/10 px-3 py-2.5 font-bold">
                   <span>Net Balance</span>
-                  <span className={`text-right ${summary.netBalance >= 0 ? 'text-success' : 'text-outgoing'}`}>
+                  <span className={summary.netBalance >= 0 ? 'text-success' : 'text-outgoing'}>
                     {formatWhole(summary.netBalance)}
                   </span>
                 </div>
                 {currency === 'NPR' && (
-                  <div className="grid grid-cols-2 px-3 py-2.5 sm:px-4 sm:py-3">
+                  <div className="flex items-center justify-between gap-3 rounded-md px-3 py-2.5">
                     <span className="text-muted-foreground">Exact Receivable / Payable</span>
-                    <span className={`text-right font-semibold ${summary.partyNet >= 0 ? 'text-success' : 'text-outgoing'}`}>
+                    <span className={`font-semibold ${summary.partyNet >= 0 ? 'text-success' : 'text-outgoing'}`}>
                       {formatWhole(Math.abs(summary.partyNet))} {partyBalanceLabel}
                     </span>
                   </div>
@@ -246,30 +240,19 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
               </div>
             </div>
 
-            <div className="grid gap-2 text-sm sm:grid-cols-3 sm:gap-3">
-              <div className="rounded-md bg-muted/60 p-2.5 sm:p-3">
-                <p className="text-xs text-muted-foreground">Received entries</p>
-                <p className="mt-1 font-semibold">{data?.usd.filter((entry) => entry.direction === 'INCOMING').length || 0}</p>
+            <div className="flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span>Received: <strong className="text-foreground">{data?.usd.filter((entry) => entry.direction === 'INCOMING').length || 0}</strong></span>
+                <span>Payment: <strong className="text-foreground">{data?.npr.filter((entry) => entry.direction === 'OUTGOING').length || 0}</strong></span>
               </div>
-              <div className="rounded-md bg-muted/60 p-2.5 sm:p-3">
-                <p className="text-xs text-muted-foreground">Payment entries</p>
-                <p className="mt-1 font-semibold">{data?.npr.filter((entry) => entry.direction === 'OUTGOING').length || 0}</p>
+              <div className="grid grid-cols-2 gap-2 sm:flex">
+                <Button variant="outline" size="sm" onClick={() => setDetailsMode('NPR')}>
+                  NPR Details
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setDetailsMode('USD')}>
+                  USD Details
+                </Button>
               </div>
-              {currency === 'NPR' && (
-                <div className="rounded-md bg-muted/60 p-2.5 sm:p-3">
-                  <p className="text-xs text-muted-foreground">Party ledger net (NPR)</p>
-                  <p className="mt-1 font-semibold">{formatWhole(Math.abs(summary.partyOutgoingNpr - summary.partyIncomingNpr))}</p>
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-2 border-t pt-3 sm:flex-row sm:justify-end">
-              <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setDetailsMode('NPR')}>
-                NPR Details
-              </Button>
-              <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setDetailsMode('USD')}>
-                USD Details
-              </Button>
             </div>
           </div>
         )}
