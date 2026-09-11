@@ -12,7 +12,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Pencil, Trash2, Settings as SettingsIcon, UserCog, FileText, RefreshCw } from 'lucide-react';
+import { Plus, Pencil, Trash2, Settings as SettingsIcon, UserCog, FileText, RefreshCw, KeyRound } from 'lucide-react';
 import {
   useNetworthCategories, useSaveCategory, useDeleteCategory,
   useNetworthSettings, useSaveSettings, type NetworthCategory,
@@ -21,6 +21,7 @@ import { NETWORTH_GROUPS, type NetworthGroup, type NetworthType } from '@/lib/ne
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import UserManagement from '@/pages/UserManagement';
 import AccessLogs from '@/pages/AccessLogs';
+import { SettingsModal } from '@/components/settings/SettingsModal';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -110,6 +111,10 @@ export default function NetworthSettings() {
           <TabsTrigger value="users" className="gap-2">
             <UserCog className="h-4 w-4" />
             User Management
+          </TabsTrigger>
+          <TabsTrigger value="active-accounts" className="gap-2">
+            <KeyRound className="h-4 w-4" />
+            Active Accounts
           </TabsTrigger>
           <TabsTrigger value="logs" className="gap-2">
             <FileText className="h-4 w-4" />
@@ -232,6 +237,10 @@ export default function NetworthSettings() {
               onDelete={(id) => setConfirmId(id)}
             />
           </div>
+        </TabsContent>
+
+        <TabsContent value="active-accounts">
+          <SettingsModal embedded open={false} onOpenChange={() => undefined} />
         </TabsContent>
 
         <TabsContent value="users">
