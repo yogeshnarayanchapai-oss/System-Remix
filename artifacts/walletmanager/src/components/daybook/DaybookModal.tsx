@@ -14,6 +14,7 @@ interface DaybookModalProps {
 }
 
 type Currency = 'NPR' | 'USD';
+type DirectionFilter = 'ALL' | 'INCOMING' | 'OUTGOING';
 
 function formatWhole(value: number) {
   return Math.round(value).toLocaleString('en-US');
@@ -22,6 +23,7 @@ function formatWhole(value: number) {
 export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
   const [currency, setCurrency] = useState<Currency>('NPR');
   const [detailsMode, setDetailsMode] = useState<Currency | null>(null);
+  const [directionFilter, setDirectionFilter] = useState<DirectionFilter>('ALL');
   const [selectedDate, setSelectedDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const selectedDateObject = new Date(`${selectedDate}T00:00:00`);
   const selectedDateLabel = format(selectedDateObject, 'dd-MMM-yyyy');
@@ -94,23 +96,46 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
   const renderDetails = (mode: Currency) => {
     const isUsd = mode === 'USD';
     const entries = isUsd ? data?.usd || [] : data?.npr || [];
+    const filteredEntries = directionFilter === 'ALL'
+      ? entries
+      : entries.filter((entry) => entry.direction === directionFilter);
 
     return (
       <div className="min-h-0 space-y-3">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <Button variant="ghost" size="sm" className="-ml-2" onClick={() => setDetailsMode(null)}>
             <ArrowLeft className="mr-1.5 h-4 w-4" /> Summary
           </Button>
-          <span className="text-xs text-muted-foreground">{entries.length} entries</span>
+          <span className="text-xs text-muted-foreground">{filteredEntries.length} entries</span>
+        </div>
+        <div className="flex items-center justify-between gap-2 rounded-md border bg-muted/30 p-1">
+          <span className="px-1.5 text-[11px] text-muted-foreground">Show</span>
+          <div className="flex gap-1">
+            {([
+              ['ALL', 'All'],
+              ['INCOMING', 'In'],
+              ['OUTGOING', 'Out'],
+            ] as const).map(([value, label]) => (
+              <Button
+                key={value}
+                variant={directionFilter === value ? 'default' : 'ghost'}
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => setDirectionFilter(value)}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
         </div>
 
         <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
-          {entries.length === 0 ? (
+          {filteredEntries.length === 0 ? (
             <div className="rounded-lg border py-10 text-center text-sm text-muted-foreground">
-              No {mode} entries for {selectedDateLabel}.
+              No {mode} {directionFilter === 'ALL' ? '' : directionFilter.toLowerCase()} entries for {selectedDateLabel}.
             </div>
           ) : (
-            entries.map((entry) => (
+            filteredEntries.map((entry) => (
               <div key={entry.id} className="rounded-lg border bg-card p-3 text-sm shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -252,10 +277,16 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
                 <span className="min-w-0 truncate rounded bg-muted px-1 py-1 text-center whitespace-nowrap">Avg Rate: <strong className="text-foreground">{formatWhole(summary.averageRate)}</strong></span>
               </div>
               <div className="grid w-full grid-cols-2 gap-1.5 sm:w-auto sm:flex">
-                <Button variant="outline" size="sm" className="h-8 whitespace-nowrap px-2 text-xs" onClick={() => setDetailsMode('NPR')}>
+              <Button variant="outline" size="sm" className="h-8 whitespace-nowrap px-2 text-xs" onClick={() => {
+                setDirectionFilter('ALL');
+                setDetailsMode('NPR');
+              }}>
                   NPR Details
                 </Button>
-                <Button variant="outline" size="sm" className="h-8 whitespace-nowrap px-2 text-xs" onClick={() => setDetailsMode('USD')}>
+              <Button variant="outline" size="sm" className="h-8 whitespace-nowrap px-2 text-xs" onClick={() => {
+                setDirectionFilter('ALL');
+                setDetailsMode('USD');
+              }}>
                   USD Details
                 </Button>
               </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowDownLeft, ArrowUpRight, Wallet, TrendingUp, Calendar, CreditCard, ChevronRight, Mail, Users, Scale, Eye, ArrowUpDown, Layers, ArrowRightLeft, Check, MailX, DollarSign, TrendingDown, Banknote, Settings, BookOpen } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Wallet, TrendingUp, Calendar, CreditCard, ChevronRight, Mail, Users, Scale, Eye, ArrowUpDown, Layers, ArrowRightLeft, Check, MailX, DollarSign, TrendingDown, Banknote, BookOpen } from 'lucide-react';
 import { format } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -29,7 +29,6 @@ import { BulkTransactionModal } from '@/components/transactions/BulkTransactionM
 import { TransferModal } from '@/components/transfers/TransferModal';
 import { PartyLedgerModal } from '@/components/party/PartyLedgerModal';
 import { NepaliAccountSelect } from '@/components/nepali-accounts/NepaliAccountSelect';
-import { SettingsModal } from '@/components/settings/SettingsModal';
 import { DaybookModal } from '@/components/daybook/DaybookModal';
 import { PartySummary } from '@/lib/types';
 
@@ -41,7 +40,6 @@ export default function Dashboard() {
   const [sortBy, setSortBy] = useState<SortBy>('recent');
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showDaybook, setShowDaybook] = useState(false);
   const [viewLedger, setViewLedger] = useState<PartySummary | null>(null);
   const [settlingParty, setSettlingParty] = useState<PartySummary | null>(null);
@@ -127,9 +125,6 @@ export default function Dashboard() {
     <AppLayout>
       <PageHeader title="Dashboard" description="Overview of all wallet accounts and transactions"
         actions={<div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
-          <Button variant="outline" size="sm" className="min-w-0" onClick={() => setShowSettingsModal(true)} title="Settings">
-            <Settings className="h-4 w-4" />
-          </Button>
           {isAdmin && (
             <Button variant="outline" size="sm" className="min-w-0" onClick={() => setShowDaybook(true)}>
               <BookOpen className="mr-2 h-4 w-4" />Daybook
@@ -142,12 +137,26 @@ export default function Dashboard() {
 
       {/* Party Receivable/Payable Summary - NPR values - Visible to ALL */}
       <Card className="mb-8">
-        <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-4">
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3"><Users className="h-5 w-5 text-muted-foreground" /><div><CardTitle className="text-base">Party Receivable / Payable (NPR)</CardTitle><p className="text-sm text-muted-foreground">Party ledger summary</p></div></div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2"><Switch id="hide-zero" checked={hideZeroBalance} onCheckedChange={setHideZeroBalance} /><Label htmlFor="hide-zero" className="text-sm font-normal">Hide zero balance</Label></div>
-            <Button variant="ghost" size="sm" onClick={() => setSortBy(sortBy === 'recent' ? 'total' : sortBy === 'total' ? 'unsettled' : 'recent')}><ArrowUpDown className="h-4 w-4 mr-1" />Sort by {sortBy === 'recent' ? 'Total' : sortBy === 'total' ? 'Entries' : 'Recent'}</Button>
-            <Link to="/receivable-payable"><Button variant="outline" size="sm">View All <ChevronRight className="ml-1 h-4 w-4" /></Button></Link>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+            <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+              <Switch id="hide-zero" checked={hideZeroBalance} onCheckedChange={setHideZeroBalance} />
+              <Label htmlFor="hide-zero" className="text-xs font-normal leading-tight sm:text-sm">Hide zero balance</Label>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="min-w-0 flex-1 px-2 text-xs sm:flex-none sm:px-3 sm:text-sm"
+              onClick={() => setSortBy(sortBy === 'recent' ? 'total' : sortBy === 'total' ? 'unsettled' : 'recent')}
+            >
+              <ArrowUpDown className="mr-1 h-4 w-4 shrink-0" />Sort by {sortBy === 'recent' ? 'Total' : sortBy === 'total' ? 'Entries' : 'Recent'}
+            </Button>
+            <Link to="/receivable-payable" className="min-w-0 flex-1 sm:flex-none">
+              <Button variant="outline" size="sm" className="w-full px-2 text-xs sm:w-auto sm:px-3 sm:text-sm">
+                View All <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            </Link>
           </div>
         </CardHeader>
         <CardContent>
@@ -394,8 +403,6 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Settings Modal */}
-      <SettingsModal open={showSettingsModal} onOpenChange={setShowSettingsModal} />
     </AppLayout>
   );
 }
