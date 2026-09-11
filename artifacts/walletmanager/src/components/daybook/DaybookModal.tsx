@@ -212,22 +212,27 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
                 <span>Daybook Summary</span>
                 <span className="text-right">{currency}</span>
               </div>
-              <div className="grid gap-2 p-2.5 sm:grid-cols-2 sm:p-3">
-                <div className="rounded-lg border-l-4 border-success bg-success/10 p-2.5">
-                  <p className="text-xs font-medium text-muted-foreground sm:text-sm">Total Received ({currency})</p>
-                  <p className="mt-1 text-lg font-bold text-success sm:text-xl">{formatWhole(summary.received)}</p>
+              <div className="grid grid-cols-2 gap-2 p-2 sm:grid-cols-3 sm:p-2.5">
+                <div className="rounded-md border-l-4 border-success bg-success/10 p-2">
+                  <p className="text-[11px] font-medium text-muted-foreground sm:text-xs">Total Received ({currency})</p>
+                  <p className="mt-1 text-base font-bold text-success sm:text-lg">{formatWhole(summary.received)}</p>
                   {currency === 'NPR' && (
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <p className="mt-1 truncate text-[10px] text-muted-foreground sm:text-xs">
                       {formatWhole(summary.receivedUsd)} received × average rate {formatWhole(summary.averageRate)}
                     </p>
                   )}
                 </div>
-                <div className="rounded-lg border-l-4 border-outgoing bg-outgoing/10 p-2.5">
-                  <p className="text-xs font-medium text-muted-foreground sm:text-sm">Total Payment ({currency})</p>
-                  <p className="mt-1 text-lg font-bold text-outgoing sm:text-xl">{formatWhole(summary.payment)}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                <div className="rounded-md border-l-4 border-outgoing bg-outgoing/10 p-2">
+                  <p className="text-[11px] font-medium text-muted-foreground sm:text-xs">Total Payment ({currency})</p>
+                  <p className="mt-1 text-base font-bold text-outgoing sm:text-lg">{formatWhole(summary.payment)}</p>
+                  <p className="mt-1 truncate text-[10px] text-muted-foreground sm:text-xs">
                     {currency === 'NPR' ? 'Outgoing party ledger total' : 'Outgoing USD transaction total'}
                   </p>
+                </div>
+                <div className="col-span-2 rounded-md border-l-4 border-primary bg-primary/10 p-2 sm:col-span-1">
+                  <p className="text-[11px] font-medium text-muted-foreground sm:text-xs">Transfers</p>
+                  <p className="mt-1 text-base font-bold text-primary sm:text-lg">{data?.transferCount || 0}</p>
+                  <p className="mt-1 text-[10px] text-muted-foreground sm:text-xs">On this date</p>
                 </div>
               </div>
               <div className="grid gap-2 border-t bg-muted/20 p-3 text-sm sm:grid-cols-2 sm:p-4">
@@ -252,7 +257,6 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
               <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
                 <span className="rounded bg-muted px-2 py-1">{receivedCountLabel}: <strong className="text-foreground">{receivedCount}</strong></span>
                 <span className="rounded bg-muted px-2 py-1">{paymentCountLabel}: <strong className="text-foreground">{paymentCount}</strong></span>
-                <span className="rounded bg-muted px-2 py-1">Transfers: <strong className="text-foreground">{data?.transferCount || 0}</strong></span>
               </div>
               <div className="grid grid-cols-2 gap-1.5 sm:flex">
                 <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => setDetailsMode('NPR')}>
