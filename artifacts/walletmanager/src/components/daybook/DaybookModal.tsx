@@ -212,27 +212,22 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
                 <span>Daybook Summary</span>
                 <span className="text-right">{currency}</span>
               </div>
-              <div className="grid grid-cols-2 gap-2 p-2 sm:grid-cols-3 sm:p-2.5">
-                <div className="rounded-md border-l-4 border-success bg-success/10 p-2">
-                  <p className="text-[11px] font-medium text-muted-foreground sm:text-xs">Total Received ({currency})</p>
-                  <p className="mt-1 text-base font-bold text-success sm:text-lg">{formatWhole(summary.received)}</p>
-                  {currency === 'NPR' && (
-                    <p className="mt-1 truncate text-[10px] text-muted-foreground sm:text-xs">
-                      {formatWhole(summary.receivedUsd)} received × average rate {formatWhole(summary.averageRate)}
-                    </p>
-                  )}
+              <div className="grid gap-1.5 p-2 sm:grid-cols-2">
+                <div className="flex h-9 items-center justify-between gap-2 rounded-md border-l-4 border-success bg-success/10 px-2.5">
+                  <span className="text-xs font-medium text-muted-foreground">Total Received ({currency})</span>
+                  <span className="text-sm font-bold text-success">{formatWhole(summary.received)}</span>
                 </div>
-                <div className="rounded-md border-l-4 border-outgoing bg-outgoing/10 p-2">
-                  <p className="text-[11px] font-medium text-muted-foreground sm:text-xs">Total Payment ({currency})</p>
-                  <p className="mt-1 text-base font-bold text-outgoing sm:text-lg">{formatWhole(summary.payment)}</p>
-                  <p className="mt-1 truncate text-[10px] text-muted-foreground sm:text-xs">
-                    {currency === 'NPR' ? 'Outgoing party ledger total' : 'Outgoing USD transaction total'}
-                  </p>
+                <div className="flex h-9 items-center justify-between gap-2 rounded-md border-l-4 border-outgoing bg-outgoing/10 px-2.5">
+                  <span className="text-xs font-medium text-muted-foreground">Total Payment ({currency})</span>
+                  <span className="text-sm font-bold text-outgoing">{formatWhole(summary.payment)}</span>
                 </div>
-                <div className="col-span-2 rounded-md border-l-4 border-primary bg-primary/10 p-2 sm:col-span-1">
-                  <p className="text-[11px] font-medium text-muted-foreground sm:text-xs">Transfers</p>
-                  <p className="mt-1 text-base font-bold text-primary sm:text-lg">{data?.transferCount || 0}</p>
-                  <p className="mt-1 text-[10px] text-muted-foreground sm:text-xs">On this date</p>
+                <div className="flex h-9 items-center justify-between gap-2 rounded-md border-l-4 border-primary bg-primary/10 px-2.5">
+                  <span className="text-xs font-medium text-muted-foreground">Transfers</span>
+                  <span className="text-sm font-bold text-primary">{data?.transferCount || 0}</span>
+                </div>
+                <div className="flex h-9 items-center justify-between gap-2 rounded-md bg-muted/60 px-2.5">
+                  <span className="text-xs font-medium text-muted-foreground">Average Rate</span>
+                  <span className="text-sm font-bold">{formatWhole(summary.averageRate)}</span>
                 </div>
               </div>
               <div className="grid gap-2 border-t bg-muted/20 p-3 text-sm sm:grid-cols-2 sm:p-4">
