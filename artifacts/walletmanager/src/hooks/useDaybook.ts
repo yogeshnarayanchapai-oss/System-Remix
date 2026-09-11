@@ -71,13 +71,30 @@ export function useDaybook({ dateFrom, dateTo, enabled = true }: DaybookFilters 
         nprQuery = nprQuery.lte('entry_date', dateTo);
       }
 
-      const [{ data: usdData, error: usdError }, { data: nprData, error: nprError }] = await Promise.all([
+      let transferQuery = supabase
+        .from('wallet_transfers')
+        .select('id', { count: 'exact', head: true });
+
+      if (dateFrom) {
+        transferQuery = transferQuery.gte('transfer_date', dateFrom);
+      }
+      if (dateTo) {
+        transferQuery = transferQuery.lte('transfer_date', dateTo);
+      }
+
+      const [
+        { data: usdData, error: usdError },
+        { data: nprData, error: nprError },
+        { count: transferCount, error: transferError },
+      ] = await Promise.all([
         usdQuery,
         nprQuery,
+        transferQuery,
       ]);
 
       if (usdError) throw usdError;
       if (nprError) throw nprError;
+      if (transferError) throw transferError;
 
       return {
         usd: ((usdData || []) as any[]).map((entry): DaybookUsdEntry => ({
@@ -99,6 +116,7 @@ export function useDaybook({ dateFrom, dateTo, enabled = true }: DaybookFilters 
           partyName: entry.parties?.party_name || 'Unknown party',
           remark: entry.remark,
         })),
+        transferCount: transferCount || 0,
       };
     },
   });

@@ -72,6 +72,14 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
 
   const partyBalanceLabel = summary.partyNet > 0 ? 'Receivable' : summary.partyNet < 0 ? 'Payable' : 'Settled';
   const nextCurrency: Currency = currency === 'NPR' ? 'USD' : 'NPR';
+  const receivedCount = currency === 'NPR'
+    ? data?.npr.filter((entry) => entry.direction === 'INCOMING').length || 0
+    : data?.usd.filter((entry) => entry.direction === 'INCOMING').length || 0;
+  const paymentCount = currency === 'NPR'
+    ? data?.npr.filter((entry) => entry.direction === 'OUTGOING').length || 0
+    : data?.usd.filter((entry) => entry.direction === 'OUTGOING').length || 0;
+  const receivedCountLabel = currency === 'NPR' ? 'NPR Received' : 'USD Incoming';
+  const paymentCountLabel = currency === 'NPR' ? 'NPR Payment' : 'USD Outgoing';
   const moveDate = (days: number) => {
     setSelectedDate(format(addDays(selectedDateObject, days), 'yyyy-MM-dd'));
     setDetailsMode(null);
@@ -204,19 +212,19 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
                 <span>Daybook Summary</span>
                 <span className="text-right">{currency}</span>
               </div>
-              <div className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4">
-                <div className="rounded-lg border-l-4 border-success bg-success/10 p-3">
+              <div className="grid gap-2 p-2.5 sm:grid-cols-2 sm:p-3">
+                <div className="rounded-lg border-l-4 border-success bg-success/10 p-2.5">
                   <p className="text-xs font-medium text-muted-foreground sm:text-sm">Total Received ({currency})</p>
-                  <p className="mt-1 text-xl font-bold text-success sm:text-2xl">{formatWhole(summary.received)}</p>
+                  <p className="mt-1 text-lg font-bold text-success sm:text-xl">{formatWhole(summary.received)}</p>
                   {currency === 'NPR' && (
                     <p className="mt-1 text-xs text-muted-foreground">
                       {formatWhole(summary.receivedUsd)} received × average rate {formatWhole(summary.averageRate)}
                     </p>
                   )}
                 </div>
-                <div className="rounded-lg border-l-4 border-outgoing bg-outgoing/10 p-3">
+                <div className="rounded-lg border-l-4 border-outgoing bg-outgoing/10 p-2.5">
                   <p className="text-xs font-medium text-muted-foreground sm:text-sm">Total Payment ({currency})</p>
-                  <p className="mt-1 text-xl font-bold text-outgoing sm:text-2xl">{formatWhole(summary.payment)}</p>
+                  <p className="mt-1 text-lg font-bold text-outgoing sm:text-xl">{formatWhole(summary.payment)}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {currency === 'NPR' ? 'Outgoing party ledger total' : 'Outgoing USD transaction total'}
                   </p>
@@ -240,16 +248,17 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
               </div>
             </div>
 
-            <div className="flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                <span>Received: <strong className="text-foreground">{data?.usd.filter((entry) => entry.direction === 'INCOMING').length || 0}</strong></span>
-                <span>Payment: <strong className="text-foreground">{data?.npr.filter((entry) => entry.direction === 'OUTGOING').length || 0}</strong></span>
+            <div className="flex flex-col gap-2 border-t pt-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                <span className="rounded bg-muted px-2 py-1">{receivedCountLabel}: <strong className="text-foreground">{receivedCount}</strong></span>
+                <span className="rounded bg-muted px-2 py-1">{paymentCountLabel}: <strong className="text-foreground">{paymentCount}</strong></span>
+                <span className="rounded bg-muted px-2 py-1">Transfers: <strong className="text-foreground">{data?.transferCount || 0}</strong></span>
               </div>
-              <div className="grid grid-cols-2 gap-2 sm:flex">
-                <Button variant="outline" size="sm" onClick={() => setDetailsMode('NPR')}>
+              <div className="grid grid-cols-2 gap-1.5 sm:flex">
+                <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => setDetailsMode('NPR')}>
                   NPR Details
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setDetailsMode('USD')}>
+                <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => setDetailsMode('USD')}>
                   USD Details
                 </Button>
               </div>
