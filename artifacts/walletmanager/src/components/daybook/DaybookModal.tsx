@@ -150,7 +150,11 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
       });
     }
 
-    const detailRows = Array.from(rows.values()).sort((a, b) => a.name.localeCompare(b.name));
+    const detailRows = Array.from(rows.values()).sort((a, b) => {
+      const totalA = a.incoming + a.outgoing + a.transferIn + a.transferOut;
+      const totalB = b.incoming + b.outgoing + b.transferIn + b.transferOut;
+      return totalB - totalA || a.name.localeCompare(b.name);
+    });
     const hasTransferColumns = detailsGrouping === 'WALLET';
     const unit = isUsd ? 'USD' : 'NPR';
     const groupLabel = detailsGrouping === 'PARTY' ? 'parties' : 'wallets';
