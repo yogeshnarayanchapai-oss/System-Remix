@@ -267,7 +267,7 @@ export default function Dashboard() {
                 <StatCard 
                   title="Total Wallet Balance" 
                   value={showSensitive ? Math.round(walletBalance?.totalBalanceUsd || 0).toLocaleString() : MASK} 
-                  subtitle={`${walletBalance?.walletCount || 0} wallets`}
+                   subtitle={`${walletBalance?.walletCount || 0} wallets · Active: ${walletBalance?.activeWalletCount || 0} · Inactive: ${walletBalance?.inactiveWalletCount || 0}`}
                   icon={<Wallet className="h-5 w-5 text-primary" />} 
                   variant="primary" 
                 />

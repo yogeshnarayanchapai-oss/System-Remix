@@ -23,6 +23,8 @@ export interface ProfitMetrics {
 export interface TotalWalletBalance {
   totalBalanceUsd: number;
   walletCount: number;
+  activeWalletCount: number;
+  inactiveWalletCount: number;
 }
 
 /**
@@ -169,11 +171,17 @@ export function useTotalWalletBalance() {
     queryKey: ['total-wallet-balance'],
     queryFn: async (): Promise<TotalWalletBalance> => {
       // Use authoritative view to avoid 1000-row limit issues
-      const { data, error } = await supabase
-        .from('paypal_accounts_with_balance')
-        .select('id, balance');
+      const [{ data, error }, { data: accounts, error: accountsError }] = await Promise.all([
+        supabase
+          .from('paypal_accounts_with_balance')
+          .select('id, balance'),
+        supabase
+          .from('paypal_accounts')
+          .select('id, is_active'),
+      ]);
 
       if (error) throw error;
+      if (accountsError) throw accountsError;
 
       let totalBalanceUsd = 0;
       data?.forEach(row => {
@@ -183,6 +191,8 @@ export function useTotalWalletBalance() {
       return {
         totalBalanceUsd,
         walletCount: data?.length || 0,
+        activeWalletCount: accounts?.filter(account => account.is_active).length || 0,
+        inactiveWalletCount: accounts?.filter(account => !account.is_active).length || 0,
       };
     },
   });
