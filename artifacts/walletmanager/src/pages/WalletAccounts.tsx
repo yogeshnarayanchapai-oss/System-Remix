@@ -57,6 +57,7 @@ export default function WalletAccounts() {
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
+  const [hideSmallBalances, setHideSmallBalances] = useState(true);
   
   // Account form state
   const [showCreateAccount, setShowCreateAccount] = useState(false);
@@ -235,6 +236,10 @@ export default function WalletAccounts() {
     } else if (statusFilter === 'inactive') {
       filtered = filtered.filter(account => !account.is_active);
     }
+
+    if (hideSmallBalances) {
+      filtered = filtered.filter(account => Math.abs(getAuthoritativeBalanceForAccount(account.id)) >= 1);
+    }
     
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -250,7 +255,7 @@ export default function WalletAccounts() {
     }
     
     return filtered;
-  }, [accounts, allEmails, searchQuery, statusFilter, viewBalances]);
+  }, [accounts, allEmails, searchQuery, statusFilter, viewBalances, hideSmallBalances]);
 
   return (
     <AppLayout>
@@ -270,6 +275,19 @@ export default function WalletAccounts() {
             Nepali Account (NPR)
           </TabsTrigger>
         </TabsList>
+
+        <div className="flex justify-end">
+          <div className="flex items-center gap-2 rounded-md border bg-muted/20 px-3 py-2">
+            <Switch
+              id="hide-small-balances"
+              checked={hideSmallBalances}
+              onCheckedChange={setHideSmallBalances}
+            />
+            <Label htmlFor="hide-small-balances" className="cursor-pointer text-sm">
+              Hide balances under 1
+            </Label>
+          </div>
+        </div>
 
         <TabsContent value="wallets">
           <div className="flex justify-end mb-4">
@@ -669,7 +687,7 @@ export default function WalletAccounts() {
         </TabsContent>
 
         <TabsContent value="nepali">
-          <NepaliAccountsTab />
+          <NepaliAccountsTab hideSmallBalances={hideSmallBalances} />
         </TabsContent>
       </Tabs>
 

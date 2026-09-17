@@ -14,7 +14,11 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useSensitiveDataVisibility } from '@/hooks/useSensitiveDataVisibility';
 import { formatNPR } from '@/lib/format';
 
-export function NepaliAccountsTab() {
+interface NepaliAccountsTabProps {
+  hideSmallBalances: boolean;
+}
+
+export function NepaliAccountsTab({ hideSmallBalances }: NepaliAccountsTabProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<NepaliAccountWithBalance | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,12 +41,15 @@ export function NepaliAccountsTab() {
     } else if (statusFilter === 'inactive') {
       filtered = filtered.filter(account => account.status === 'INACTIVE');
     }
+    if (hideSmallBalances) {
+      filtered = filtered.filter(account => Math.abs(getAvailableBalance(account)) >= 1);
+    }
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(account => account.name.toLowerCase().includes(query));
     }
     return filtered;
-  }, [accounts, searchQuery, statusFilter]);
+  }, [accounts, searchQuery, statusFilter, hideSmallBalances]);
 
   const handleEdit = (account: NepaliAccountWithBalance) => {
     setEditingAccount(account);
