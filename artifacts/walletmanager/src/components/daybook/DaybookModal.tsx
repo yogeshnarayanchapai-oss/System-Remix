@@ -165,9 +165,9 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
             {detailRows.length} {groupLabel}
           </span>
         </div>
-        <div className="flex items-center justify-between gap-2 rounded-md border bg-muted/30 p-1">
-          <span className="px-1.5 text-[11px] text-muted-foreground">Group by</span>
-          <div className="flex gap-1">
+        <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-1">
+          <span className="whitespace-nowrap px-1.5 text-[11px] text-muted-foreground">Group by</span>
+          <div className="ml-auto flex shrink-0 gap-1">
             {([
               ['PARTY', 'By Party'],
               ['WALLET', 'By Wallet'],
@@ -185,7 +185,7 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
           </div>
         </div>
 
-        <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
+        <div className="max-h-[55vh] space-y-1.5 overflow-y-auto pr-1">
           {detailRows.length === 0 ? (
             <div className="rounded-lg border py-10 text-center text-sm text-muted-foreground">
               No {mode} activity for {selectedDateLabel}.
@@ -194,36 +194,40 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
             detailRows.map((row) => {
               const net = row.incoming + row.transferIn - row.outgoing - row.transferOut;
               return (
-              <div key={row.name} className="rounded-lg border bg-card p-3 text-sm shadow-sm">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <p className="truncate font-medium">{row.name}</p>
-                  <span className={`shrink-0 font-semibold ${net >= 0 ? 'text-success' : 'text-outgoing'}`}>
-                    Net {formatWhole(net)} {unit}
+                <div
+                  key={row.name}
+                  className={`grid items-center gap-2 rounded-md border bg-card px-2.5 py-2 text-xs ${
+                    hasTransferColumns
+                      ? 'min-w-[720px] grid-cols-[minmax(150px,1.35fr)_repeat(5,minmax(95px,1fr))]'
+                      : 'min-w-[520px] grid-cols-[minmax(150px,1.45fr)_repeat(3,minmax(100px,1fr))]'
+                  }`}
+                >
+                  <p className="min-w-0 truncate font-medium text-foreground">{row.name}</p>
+                  <span className="whitespace-nowrap">
+                    <span className="mr-1 text-muted-foreground">In</span>
+                    <span className="font-semibold text-success">{formatWhole(row.incoming)} {unit}</span>
                   </span>
-                </div>
-                <div className={`grid gap-2 text-xs ${hasTransferColumns ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
-                  <div className="rounded bg-success/10 px-2 py-1.5">
-                    <p className="text-muted-foreground">In</p>
-                    <p className="font-semibold text-success">{formatWhole(row.incoming)} {unit}</p>
-                  </div>
-                  <div className="rounded bg-outgoing/10 px-2 py-1.5">
-                    <p className="text-muted-foreground">Out</p>
-                    <p className="font-semibold text-outgoing">{formatWhole(row.outgoing)} {unit}</p>
-                  </div>
+                  <span className="whitespace-nowrap">
+                    <span className="mr-1 text-muted-foreground">Out</span>
+                    <span className="font-semibold text-outgoing">{formatWhole(row.outgoing)} {unit}</span>
+                  </span>
                   {hasTransferColumns && (
                     <>
-                      <div className="rounded bg-primary/10 px-2 py-1.5">
-                        <p className="text-muted-foreground">Transfer In</p>
-                        <p className="font-semibold text-primary">{formatWhole(row.transferIn)} {unit}</p>
-                      </div>
-                      <div className="rounded bg-primary/10 px-2 py-1.5">
-                        <p className="text-muted-foreground">Transfer Out</p>
-                        <p className="font-semibold text-primary">{formatWhole(row.transferOut)} {unit}</p>
-                      </div>
+                      <span className="whitespace-nowrap">
+                        <span className="mr-1 text-muted-foreground">T-In</span>
+                        <span className="font-semibold text-primary">{formatWhole(row.transferIn)} {unit}</span>
+                      </span>
+                      <span className="whitespace-nowrap">
+                        <span className="mr-1 text-muted-foreground">T-Out</span>
+                        <span className="font-semibold text-primary">{formatWhole(row.transferOut)} {unit}</span>
+                      </span>
                     </>
                   )}
+                  <span className={`whitespace-nowrap font-semibold ${net >= 0 ? 'text-success' : 'text-outgoing'}`}>
+                    <span className="mr-1 text-muted-foreground">Net</span>
+                    {formatWhole(net)} {unit}
+                  </span>
                 </div>
-              </div>
               );
             })
           )}
