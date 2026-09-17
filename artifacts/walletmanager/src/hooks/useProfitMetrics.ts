@@ -23,8 +23,8 @@ export interface ProfitMetrics {
 export interface TotalWalletBalance {
   totalBalanceUsd: number;
   walletCount: number;
-  activeWalletCount: number;
-  inactiveWalletCount: number;
+  activeBalanceUsd: number;
+  inactiveBalanceUsd: number;
 }
 
 /**
@@ -183,16 +183,26 @@ export function useTotalWalletBalance() {
       if (error) throw error;
       if (accountsError) throw accountsError;
 
-      let totalBalanceUsd = 0;
+      let activeBalanceUsd = 0;
+      let inactiveBalanceUsd = 0;
+      const accountStatusById = new Map(
+        (accounts || []).map(account => [account.id, account.is_active]),
+      );
+
       data?.forEach(row => {
-        totalBalanceUsd += Number(row.balance) || 0;
+        const balance = Number(row.balance) || 0;
+        if (accountStatusById.get(row.id) === true) {
+          activeBalanceUsd += balance;
+        } else {
+          inactiveBalanceUsd += balance;
+        }
       });
 
       return {
-        totalBalanceUsd,
+        totalBalanceUsd: activeBalanceUsd + inactiveBalanceUsd,
         walletCount: data?.length || 0,
-        activeWalletCount: accounts?.filter(account => account.is_active).length || 0,
-        inactiveWalletCount: accounts?.filter(account => !account.is_active).length || 0,
+        activeBalanceUsd,
+        inactiveBalanceUsd,
       };
     },
   });

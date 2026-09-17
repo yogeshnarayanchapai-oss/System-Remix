@@ -41,7 +41,7 @@ export function StatCard({
           </p>
           {subtitle && (
             <p className={cn(
-              'mt-1 text-sm',
+              'mt-1 whitespace-pre-line text-xs sm:text-sm',
               variant === 'primary' ? 'text-primary-foreground/70' : 'text-muted-foreground'
             )}>
               {subtitle}
