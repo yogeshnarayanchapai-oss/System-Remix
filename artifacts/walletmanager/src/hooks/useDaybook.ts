@@ -28,6 +28,23 @@ export interface DaybookNprEntry {
   remark: string | null;
 }
 
+export interface DaybookNprLedgerEntry {
+  id: string;
+  date: string;
+  entryType: 'CREDIT' | 'DEBIT' | 'TRANSFER_IN' | 'TRANSFER_OUT';
+  amountNpr: number;
+  walletName: string;
+  remark: string | null;
+}
+
+export interface DaybookWalletTransfer {
+  id: string;
+  amountUsd: number;
+  totalUsd: number;
+  fromWalletName: string | null;
+  toWalletName: string | null;
+}
+
 export function useDaybook({ dateFrom, dateTo, enabled = true }: DaybookFilters = {}) {
   return useQuery({
     queryKey: ['daybook', dateFrom, dateTo],
@@ -62,6 +79,19 @@ export function useDaybook({ dateFrom, dateTo, enabled = true }: DaybookFilters 
         .order('entry_date', { ascending: false })
         .order('created_at', { ascending: false });
 
+      let nprLedgerQuery = supabase
+        .from('nepali_account_ledger')
+        .select(`
+          id,
+          entry_date,
+          entry_type,
+          amount_npr,
+          remark,
+          nepali_accounts(name)
+        `)
+        .order('entry_date', { ascending: false })
+        .order('created_at', { ascending: false });
+
       if (dateFrom) {
         usdQuery = usdQuery.gte('txn_date', dateFrom);
         nprQuery = nprQuery.gte('entry_date', dateFrom);
@@ -73,28 +103,41 @@ export function useDaybook({ dateFrom, dateTo, enabled = true }: DaybookFilters 
 
       let transferQuery = supabase
         .from('wallet_transfers')
-        .select('id', { count: 'exact', head: true });
+        .select(`
+          id,
+          amount,
+          total,
+          from_wallet_id,
+          to_wallet_id,
+          from_wallet:paypal_accounts!wallet_transfers_from_wallet_id_fkey(paypal_name),
+          to_wallet:paypal_accounts!wallet_transfers_to_wallet_id_fkey(paypal_name)
+        `);
 
       if (dateFrom) {
         transferQuery = transferQuery.gte('transfer_date', dateFrom);
+        nprLedgerQuery = nprLedgerQuery.gte('entry_date', dateFrom);
       }
       if (dateTo) {
         transferQuery = transferQuery.lte('transfer_date', dateTo);
+        nprLedgerQuery = nprLedgerQuery.lte('entry_date', dateTo);
       }
 
       const [
         { data: usdData, error: usdError },
         { data: nprData, error: nprError },
-        { count: transferCount, error: transferError },
+        { data: transferData, error: transferError },
+        { data: nprLedgerData, error: nprLedgerError },
       ] = await Promise.all([
         usdQuery,
         nprQuery,
         transferQuery,
+        nprLedgerQuery,
       ]);
 
       if (usdError) throw usdError;
       if (nprError) throw nprError;
       if (transferError) throw transferError;
+      if (nprLedgerError) throw nprLedgerError;
 
       const allPartyTransactions: Array<{ entry_type: string; amount_npr: number }> = [];
       let partyPageFrom = 0;
@@ -140,7 +183,22 @@ export function useDaybook({ dateFrom, dateTo, enabled = true }: DaybookFilters 
           partyName: entry.parties?.party_name || 'Unknown party',
           remark: entry.remark,
         })),
-        transferCount: transferCount || 0,
+        nprLedger: ((nprLedgerData || []) as any[]).map((entry): DaybookNprLedgerEntry => ({
+          id: entry.id,
+          date: entry.entry_date,
+          entryType: entry.entry_type,
+          amountNpr: Number(entry.amount_npr) || 0,
+          walletName: entry.nepali_accounts?.name || 'Unknown NPR account',
+          remark: entry.remark,
+        })),
+        walletTransfers: ((transferData || []) as any[]).map((transfer): DaybookWalletTransfer => ({
+          id: transfer.id,
+          amountUsd: Number(transfer.amount) || 0,
+          totalUsd: Number(transfer.total) || 0,
+          fromWalletName: transfer.from_wallet?.paypal_name || null,
+          toWalletName: transfer.to_wallet?.paypal_name || null,
+        })),
+        transferCount: transferData?.length || 0,
         partyBalanceNpr,
       };
     },

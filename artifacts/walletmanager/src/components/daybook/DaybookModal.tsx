@@ -14,7 +14,7 @@ interface DaybookModalProps {
 }
 
 type Currency = 'NPR' | 'USD';
-type DirectionFilter = 'ALL' | 'INCOMING' | 'OUTGOING';
+type DetailsGrouping = 'PARTY' | 'WALLET';
 
 function formatWhole(value: number) {
   return Math.round(value).toLocaleString('en-US');
@@ -23,7 +23,7 @@ function formatWhole(value: number) {
 export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
   const [currency, setCurrency] = useState<Currency>('NPR');
   const [detailsMode, setDetailsMode] = useState<Currency | null>(null);
-  const [directionFilter, setDirectionFilter] = useState<DirectionFilter>('ALL');
+  const [detailsGrouping, setDetailsGrouping] = useState<DetailsGrouping>('PARTY');
   const [selectedDate, setSelectedDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const selectedDateObject = new Date(`${selectedDate}T00:00:00`);
   const selectedDateLabel = format(selectedDateObject, 'dd-MMM-yyyy');
@@ -95,10 +95,65 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
 
   const renderDetails = (mode: Currency) => {
     const isUsd = mode === 'USD';
-    const entries = isUsd ? data?.usd || [] : data?.npr || [];
-    const filteredEntries = directionFilter === 'ALL'
-      ? entries
-      : entries.filter((entry) => entry.direction === directionFilter);
+    type DetailsRow = {
+      name: string;
+      incoming: number;
+      outgoing: number;
+      transferIn: number;
+      transferOut: number;
+    };
+
+    const rows = new Map<string, DetailsRow>();
+    const getRow = (name: string) => {
+      const existing = rows.get(name);
+      if (existing) return existing;
+      const created = { name, incoming: 0, outgoing: 0, transferIn: 0, transferOut: 0 };
+      rows.set(name, created);
+      return created;
+    };
+
+    if (detailsGrouping === 'PARTY') {
+      if (isUsd) {
+        (data?.usd || []).forEach((entry) => {
+          const row = getRow(entry.partyName);
+          if (entry.direction === 'INCOMING') row.incoming += entry.amountUsd;
+          else row.outgoing += entry.amountUsd;
+        });
+      } else {
+        (data?.npr || []).forEach((entry) => {
+          const row = getRow(entry.partyName);
+          if (entry.direction === 'INCOMING') row.incoming += entry.amountNpr;
+          else row.outgoing += entry.amountNpr;
+        });
+      }
+    } else if (isUsd) {
+      (data?.usd || []).forEach((entry) => {
+        const row = getRow(entry.walletName);
+        if (entry.direction === 'INCOMING') row.incoming += entry.amountUsd;
+        else row.outgoing += entry.amountUsd;
+      });
+      (data?.walletTransfers || []).forEach((transfer) => {
+        if (transfer.fromWalletName) {
+          getRow(transfer.fromWalletName).transferOut += transfer.totalUsd;
+        }
+        if (transfer.toWalletName) {
+          getRow(transfer.toWalletName).transferIn += transfer.amountUsd;
+        }
+      });
+    } else {
+      (data?.nprLedger || []).forEach((entry) => {
+        const row = getRow(entry.walletName);
+        if (entry.entryType === 'CREDIT') row.incoming += entry.amountNpr;
+        if (entry.entryType === 'DEBIT') row.outgoing += entry.amountNpr;
+        if (entry.entryType === 'TRANSFER_IN') row.transferIn += entry.amountNpr;
+        if (entry.entryType === 'TRANSFER_OUT') row.transferOut += entry.amountNpr;
+      });
+    }
+
+    const detailRows = Array.from(rows.values()).sort((a, b) => a.name.localeCompare(b.name));
+    const hasTransferColumns = detailsGrouping === 'WALLET';
+    const unit = isUsd ? 'USD' : 'NPR';
+    const groupLabel = detailsGrouping === 'PARTY' ? 'parties' : 'wallets';
 
     return (
       <div className="min-h-0 space-y-3">
@@ -106,22 +161,23 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
           <Button variant="ghost" size="sm" className="-ml-2" onClick={() => setDetailsMode(null)}>
             <ArrowLeft className="mr-1.5 h-4 w-4" /> Summary
           </Button>
-          <span className="text-xs text-muted-foreground">{filteredEntries.length} entries</span>
+          <span className="text-xs text-muted-foreground">
+            {detailRows.length} {groupLabel}
+          </span>
         </div>
         <div className="flex items-center justify-between gap-2 rounded-md border bg-muted/30 p-1">
-          <span className="px-1.5 text-[11px] text-muted-foreground">Show</span>
+          <span className="px-1.5 text-[11px] text-muted-foreground">Group by</span>
           <div className="flex gap-1">
             {([
-              ['ALL', 'All'],
-              ['INCOMING', 'In'],
-              ['OUTGOING', 'Out'],
+              ['PARTY', 'By Party'],
+              ['WALLET', 'By Wallet'],
             ] as const).map(([value, label]) => (
               <Button
                 key={value}
-                variant={directionFilter === value ? 'default' : 'ghost'}
+                variant={detailsGrouping === value ? 'default' : 'ghost'}
                 size="sm"
                 className="h-7 px-2 text-xs"
-                onClick={() => setDirectionFilter(value)}
+                onClick={() => setDetailsGrouping(value)}
               >
                 {label}
               </Button>
@@ -130,38 +186,46 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
         </div>
 
         <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
-          {filteredEntries.length === 0 ? (
+          {detailRows.length === 0 ? (
             <div className="rounded-lg border py-10 text-center text-sm text-muted-foreground">
-              No {mode} {directionFilter === 'ALL' ? '' : directionFilter.toLowerCase()} entries for {selectedDateLabel}.
+              No {mode} activity for {selectedDateLabel}.
             </div>
           ) : (
-            filteredEntries.map((entry) => (
-              <div key={entry.id} className="rounded-lg border bg-card p-3 text-sm shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">
-                      {isUsd ? entry.partyName : entry.partyName}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {isUsd ? entry.walletName : entry.remark || 'No remark'}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className={`font-semibold ${entry.direction === 'INCOMING' ? 'text-success' : 'text-outgoing'}`}>
-                      {entry.direction === 'INCOMING' ? '+' : '-'} {formatWhole(isUsd ? entry.amountUsd : entry.amountNpr)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{entry.direction === 'INCOMING' ? 'Received' : 'Payment'}</p>
-                  </div>
+            detailRows.map((row) => {
+              const net = row.incoming + row.transferIn - row.outgoing - row.transferOut;
+              return (
+              <div key={row.name} className="rounded-lg border bg-card p-3 text-sm shadow-sm">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <p className="truncate font-medium">{row.name}</p>
+                  <span className={`shrink-0 font-semibold ${net >= 0 ? 'text-success' : 'text-outgoing'}`}>
+                    Net {formatWhole(net)} {unit}
+                  </span>
                 </div>
-                {isUsd && (
-                  <div className="mt-2 flex gap-4 border-t pt-2 text-xs text-muted-foreground">
-                    <span>Rate: {formatWhole(entry.rate)}</span>
-                    <span>NPR total: {formatWhole(entry.totalNpr)}</span>
-                    {entry.remark && <span className="truncate">{entry.remark}</span>}
+                <div className={`grid gap-2 text-xs ${hasTransferColumns ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
+                  <div className="rounded bg-success/10 px-2 py-1.5">
+                    <p className="text-muted-foreground">In</p>
+                    <p className="font-semibold text-success">{formatWhole(row.incoming)} {unit}</p>
                   </div>
-                )}
+                  <div className="rounded bg-outgoing/10 px-2 py-1.5">
+                    <p className="text-muted-foreground">Out</p>
+                    <p className="font-semibold text-outgoing">{formatWhole(row.outgoing)} {unit}</p>
+                  </div>
+                  {hasTransferColumns && (
+                    <>
+                      <div className="rounded bg-primary/10 px-2 py-1.5">
+                        <p className="text-muted-foreground">Transfer In</p>
+                        <p className="font-semibold text-primary">{formatWhole(row.transferIn)} {unit}</p>
+                      </div>
+                      <div className="rounded bg-primary/10 px-2 py-1.5">
+                        <p className="text-muted-foreground">Transfer Out</p>
+                        <p className="font-semibold text-primary">{formatWhole(row.transferOut)} {unit}</p>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
@@ -278,13 +342,13 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
               </div>
               <div className="grid w-full grid-cols-2 gap-1.5 sm:w-auto sm:flex">
               <Button variant="outline" size="sm" className="h-8 whitespace-nowrap px-2 text-xs" onClick={() => {
-                setDirectionFilter('ALL');
+                setDetailsGrouping('PARTY');
                 setDetailsMode('NPR');
               }}>
                   NPR Details
                 </Button>
               <Button variant="outline" size="sm" className="h-8 whitespace-nowrap px-2 text-xs" onClick={() => {
-                setDirectionFilter('ALL');
+                setDetailsGrouping('PARTY');
                 setDetailsMode('USD');
               }}>
                   USD Details
