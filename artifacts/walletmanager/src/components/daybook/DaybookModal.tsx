@@ -165,9 +165,9 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
             {detailRows.length} {groupLabel}
           </span>
         </div>
-        <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 p-1">
+        <div className="flex min-w-0 items-center gap-2 rounded-md border bg-muted/30 p-1">
           <span className="whitespace-nowrap px-1.5 text-[11px] text-muted-foreground">Group by</span>
-          <div className="ml-auto flex shrink-0 gap-1">
+          <div className="grid min-w-0 flex-1 grid-cols-2 gap-1 sm:ml-auto sm:flex sm:flex-none">
             {([
               ['PARTY', 'By Party'],
               ['WALLET', 'By Wallet'],
@@ -176,7 +176,7 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
                 key={value}
                 variant={detailsGrouping === value ? 'default' : 'ghost'}
                 size="sm"
-                className="h-7 px-2 text-xs"
+                className="h-7 min-w-0 px-2 text-xs"
                 onClick={() => setDetailsGrouping(value)}
               >
                 {label}
@@ -185,7 +185,7 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
           </div>
         </div>
 
-        <div className="max-h-[55vh] space-y-1.5 overflow-y-auto pr-1">
+        <div className="max-h-[55vh] space-y-1.5 overflow-x-hidden overflow-y-auto pr-1">
           {detailRows.length === 0 ? (
             <div className="rounded-lg border py-10 text-center text-sm text-muted-foreground">
               No {mode} activity for {selectedDateLabel}.
@@ -196,13 +196,13 @@ export function DaybookModal({ open, onOpenChange }: DaybookModalProps) {
               return (
                 <div
                   key={row.name}
-                  className={`grid items-center gap-2 rounded-md border bg-card px-2.5 py-2 text-xs ${
+                  className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border bg-card px-2.5 py-2 text-[10px] sm:grid sm:gap-2 sm:text-xs ${
                     hasTransferColumns
-                      ? 'min-w-[720px] grid-cols-[minmax(150px,1.35fr)_repeat(5,minmax(95px,1fr))]'
-                      : 'min-w-[520px] grid-cols-[minmax(150px,1.45fr)_repeat(3,minmax(100px,1fr))]'
+                      ? 'sm:grid-cols-[minmax(150px,1.35fr)_repeat(5,minmax(95px,1fr))]'
+                      : 'sm:grid-cols-[minmax(150px,1.45fr)_repeat(3,minmax(100px,1fr))]'
                   }`}
                 >
-                  <p className="min-w-0 truncate font-medium text-foreground">{row.name}</p>
+                  <p className="min-w-[7rem] max-w-[45%] flex-1 truncate font-medium text-foreground sm:max-w-none">{row.name}</p>
                   <span className="whitespace-nowrap">
                     <span className="mr-1 text-muted-foreground">In</span>
                     <span className="font-semibold text-success">{formatWhole(row.incoming)} {unit}</span>
