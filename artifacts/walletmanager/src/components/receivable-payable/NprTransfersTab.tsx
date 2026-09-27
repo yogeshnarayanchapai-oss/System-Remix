@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRightLeft, Search, MoreHorizontal, Trash2, Pencil } from 'lucide-react';
+import { ArrowRightLeft, Search, MoreHorizontal, Trash2, Pencil, Download } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,6 +22,7 @@ import { formatNPR } from '@/lib/format';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { NepaliAccountSelect } from '@/components/nepali-accounts/NepaliAccountSelect';
 import { toast } from 'sonner';
+import { downloadCsv } from '@/lib/csv';
 
 const DATE_PRESETS = [
   { value: 'today', label: 'Today' },
@@ -62,6 +63,22 @@ export function NprTransfersTab() {
     { value: 'all', label: 'All Accounts' },
     ...(nepaliAccounts?.map(acc => ({ value: acc.id, label: acc.name })) || []),
   ];
+
+  const handleExportCsv = () => {
+    if (!transfers?.length) return;
+    downloadCsv(
+      `receivable-payable-transfers-${format(new Date(), 'yyyy-MM-dd')}.csv`,
+      ['Date', 'From Account', 'To Account', 'Amount (NPR)', 'Remark'],
+      transfers.map((transfer) => [
+        transfer.transfer_date,
+        transfer.from_account_name,
+        transfer.to_account_name,
+        transfer.amount_npr,
+        transfer.remark || '',
+      ]),
+    );
+    toast.success(`Exported ${transfers.length} filtered transfers`);
+  };
 
   const openEdit = async (transfer: NprTransfer) => {
     // Get source_id from ledger entry
@@ -241,6 +258,15 @@ export function NprTransfersTab() {
                 />
               </div>
             </div>
+            <Button
+              variant="outline"
+              className="h-9"
+              onClick={handleExportCsv}
+              disabled={!transfers?.length || isLoading}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export CSV
+            </Button>
           </div>
         </CardContent>
       </Card>

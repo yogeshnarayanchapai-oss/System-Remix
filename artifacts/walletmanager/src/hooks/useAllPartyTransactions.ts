@@ -103,6 +103,67 @@ export function useAllPartyTransactions(filters: TransactionFilters) {
   });
 }
 
+export async function fetchAllPartyTransactions(
+  filters: Omit<TransactionFilters, 'page' | 'pageSize'>,
+): Promise<PartyTransactionWithDetails[]> {
+  const pageSize = 1000;
+  let offset = 0;
+  const allTransactions: PartyTransactionWithDetails[] = [];
+
+  while (true) {
+    let query = supabase
+      .from('party_transactions')
+      .select(`
+        id,
+        entry_date,
+        entry_type,
+        amount_npr,
+        remark,
+        nepali_account_id,
+        source_transaction_id,
+        party_id,
+        created_at,
+        parties!inner(party_name),
+        nepali_accounts(name)
+      `)
+      .order('entry_date', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (filters.dateFrom) query = query.gte('entry_date', filters.dateFrom);
+    if (filters.dateTo) query = query.lte('entry_date', filters.dateTo);
+    if (filters.partyId) query = query.eq('party_id', filters.partyId);
+    if (filters.nepaliAccountId === 'none') {
+      query = query.is('nepali_account_id', null);
+    } else if (filters.nepaliAccountId && filters.nepaliAccountId !== 'all') {
+      query = query.eq('nepali_account_id', filters.nepaliAccountId);
+    }
+    if (filters.remarkSearch) query = query.ilike('remark', `%${filters.remarkSearch}%`);
+
+    const { data, error } = await query.range(offset, offset + pageSize - 1);
+    if (error) throw error;
+
+    const batch: PartyTransactionWithDetails[] = (data || []).map((entry: any) => ({
+      id: entry.id,
+      entry_date: entry.entry_date,
+      entry_type: entry.entry_type,
+      amount_npr: entry.amount_npr,
+      remark: entry.remark,
+      nepali_account_id: entry.nepali_account_id,
+      source_transaction_id: entry.source_transaction_id,
+      party_id: entry.party_id,
+      created_at: entry.created_at,
+      party_name: entry.parties?.party_name || '',
+      nepali_account_name: entry.nepali_accounts?.name || null,
+    }));
+
+    allTransactions.push(...batch);
+    if (batch.length < pageSize) break;
+    offset += pageSize;
+  }
+
+  return allTransactions;
+}
+
 // Date filter quick options
 export type DateQuickFilter = 'today' | '7days' | '30days' | 'this_month' | 'last_month' | 'custom';
 

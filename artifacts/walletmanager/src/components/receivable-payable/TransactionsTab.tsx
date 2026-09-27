@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Search, Calendar, Filter, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Search, Calendar, Filter, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Trash2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,7 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { useAllPartyTransactions, DateQuickFilter, getDateRangeFromFilter, PartyTransactionWithDetails } from '@/hooks/useAllPartyTransactions';
+import { useAllPartyTransactions, fetchAllPartyTransactions, DateQuickFilter, getDateRangeFromFilter, PartyTransactionWithDetails } from '@/hooks/useAllPartyTransactions';
 import { useUpdatePartyTransaction, useDeletePartyTransaction } from '@/hooks/usePartyTransactions';
 import { useParties } from '@/hooks/useParties';
 import { useNepaliAccounts } from '@/hooks/useNepaliAccounts';
@@ -24,6 +24,7 @@ import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { NepaliAccountSelect } from '@/components/nepali-accounts/NepaliAccountSelect';
 import { PartySummary } from '@/lib/types';
 import { toast } from 'sonner';
+import { downloadCsv } from '@/lib/csv';
 
 interface TransactionsTabProps {
   onViewParty?: (party: PartySummary) => void;
@@ -46,6 +47,7 @@ export function TransactionsTab({ onViewParty, initialDateFrom, initialDateTo }:
   const [selectedNprAccountId, setSelectedNprAccountId] = useState<string>('all');
   const [remarkSearch, setRemarkSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Edit/Delete states
   const [editTarget, setEditTarget] = useState<PartyTransactionWithDetails | null>(null);
@@ -171,6 +173,42 @@ export function TransactionsTab({ onViewParty, initialDateFrom, initialDateTo }:
 
   const getEntryTypeVariant = (entryType: string): 'receivable' | 'payable' | 'settled' => {
     return entryType === 'OUTGOING' ? 'receivable' : 'payable';
+  };
+
+  const handleExportCsv = async () => {
+    setIsExporting(true);
+    try {
+      const transactions = await fetchAllPartyTransactions({
+        dateFrom: dateRange.from,
+        dateTo: dateRange.to,
+        partyId: selectedPartyId || undefined,
+        nepaliAccountId: selectedNprAccountId,
+        remarkSearch: remarkSearch.trim() || undefined,
+      });
+      if (!transactions.length) {
+        toast.error('No filtered transactions to export');
+        return;
+      }
+
+      downloadCsv(
+        `receivable-payable-transactions-${format(new Date(), 'yyyy-MM-dd')}.csv`,
+        ['Date', 'Party', 'Entry Type', 'Amount (NPR)', 'NPR Account', 'Remark'],
+        transactions.map((txn) => [
+          txn.entry_date,
+          txn.party_name,
+          getEntryTypeLabel(txn.entry_type),
+          txn.amount_npr,
+          txn.nepali_account_name || 'None',
+          txn.remark || '',
+        ]),
+      );
+      toast.success(`Exported ${transactions.length} filtered transactions`);
+    } catch (error) {
+      console.error('Failed to export party transactions:', error);
+      toast.error('Could not export filtered transactions');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -299,6 +337,12 @@ export function TransactionsTab({ onViewParty, initialDateFrom, initialDateTo }:
             </div>
           </div>
         </div>
+          <div className="mb-4 flex justify-end">
+            <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={isExporting || isLoading}>
+              <Download className="mr-2 h-4 w-4" />
+              {isExporting ? 'Exporting...' : 'Export CSV'}
+            </Button>
+          </div>
 
         {/* Table */}
         <div className="table-container">
