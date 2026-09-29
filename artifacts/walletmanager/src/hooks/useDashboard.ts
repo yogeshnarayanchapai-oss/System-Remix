@@ -399,7 +399,7 @@ export function useEmailsWithNoActivity(dateFrom?: string, dateTo?: string) {
  */
 export function usePartySummary() {
   return useQuery({
-    queryKey: ['dashboard', 'party-summary'],
+    queryKey: ['dashboard', 'party-summary-v2'],
     queryFn: async (): Promise<PartySummary[]> => {
       // Get all parties
       const { data: parties, error: partiesError } = await supabase
@@ -417,6 +417,7 @@ export function usePartySummary() {
         const { data: batch, error: ptError } = await supabase
           .from('party_transactions')
           .select('party_id, entry_type, amount_npr, created_at')
+          .order('id', { ascending: true })
           .range(from, from + pageSize - 1);
         
         if (ptError) throw ptError;

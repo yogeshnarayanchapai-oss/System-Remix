@@ -20,19 +20,33 @@ export interface PartyTransaction {
 
 export function usePartyTransactions(partyId?: string) {
   return useQuery({
-    queryKey: ['party-transactions', partyId],
+    queryKey: ['party-transactions', partyId, 'all-pages'],
     queryFn: async () => {
       if (!partyId) return [];
-      
-      const { data, error } = await supabase
-        .from('party_transactions')
-        .select('*')
-        .eq('party_id', partyId)
-        .order('entry_date', { ascending: false })
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data as PartyTransaction[];
+
+      const pageSize = 1000;
+      let offset = 0;
+      const allTransactions: PartyTransaction[] = [];
+
+      while (true) {
+        const { data, error } = await supabase
+          .from('party_transactions')
+          .select('*')
+          .eq('party_id', partyId)
+          .order('entry_date', { ascending: false })
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: true })
+          .range(offset, offset + pageSize - 1);
+
+        if (error) throw error;
+
+        const batch = (data || []) as PartyTransaction[];
+        allTransactions.push(...batch);
+        if (batch.length < pageSize) break;
+        offset += pageSize;
+      }
+
+      return allTransactions;
     },
     enabled: !!partyId,
   });
