@@ -24,7 +24,7 @@ import { useTotalNprBalance } from '@/hooks/useNepaliAccounts';
 import { useUserRole } from '@/hooks/useUserRole';
 
 import { useSensitiveDataVisibility } from '@/hooks/useSensitiveDataVisibility';
-import { formatUSD, formatNPR, formatNumber } from '@/lib/format';
+import { formatUSD, formatNPR, formatCompactNPR, formatNumber } from '@/lib/format';
 import { BulkTransactionModal } from '@/components/transactions/BulkTransactionModal';
 import { TransferModal } from '@/components/transfers/TransferModal';
 import { PartyLedgerModal } from '@/components/party/PartyLedgerModal';
@@ -161,9 +161,9 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent>
           <div className="mb-4 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-lg bg-success/10 p-3 text-center"><p className="text-xs text-muted-foreground">Total Receivable (लिनुपर्ने)</p><p className="text-xl font-bold text-success">{formatNPR(partyTotals.receivable)}</p></div>
-            <div className="rounded-lg bg-payable/10 p-3 text-center"><p className="text-xs text-muted-foreground">Total Payable (दिनुपर्ने)</p><p className="text-xl font-bold text-payable">{formatNPR(partyTotals.payable)}</p></div>
-            <div className="rounded-lg bg-primary/10 p-3 text-center"><p className="text-xs text-muted-foreground">Net Position</p><p className="text-xl font-bold text-primary">{formatNPR(partyTotals.receivable - partyTotals.payable)}</p></div>
+            <div className="rounded-lg bg-success/10 p-3 text-center"><p className="text-xs text-muted-foreground">Total Receivable (लिनुपर्ने)</p><p className="text-base font-bold text-success sm:text-lg" title={`${formatNPR(partyTotals.receivable)} NPR`} aria-label={`Total receivable ${formatNPR(partyTotals.receivable)} NPR`}>{formatCompactNPR(partyTotals.receivable)}</p></div>
+            <div className="rounded-lg bg-payable/10 p-3 text-center"><p className="text-xs text-muted-foreground">Total Payable (दिनुपर्ने)</p><p className="text-base font-bold text-payable sm:text-lg" title={`${formatNPR(partyTotals.payable)} NPR`} aria-label={`Total payable ${formatNPR(partyTotals.payable)} NPR`}>{formatCompactNPR(partyTotals.payable)}</p></div>
+            <div className="rounded-lg bg-primary/10 p-3 text-center"><p className="text-xs text-muted-foreground">Net Position</p><p className="text-base font-bold text-primary sm:text-lg" title={`${formatNPR(partyTotals.receivable - partyTotals.payable)} NPR`} aria-label={`Net position ${formatNPR(partyTotals.receivable - partyTotals.payable)} NPR`}>{formatCompactNPR(partyTotals.receivable - partyTotals.payable)}</p></div>
           </div>
           <div className="table-container max-h-[300px]">
             <Table><TableHeader className="table-sticky-header"><TableRow><TableHead>Party Name</TableHead><TableHead className="text-right">Receivable (NPR)</TableHead><TableHead className="text-right">Payable (NPR)</TableHead><TableHead className="text-center">Entries</TableHead><TableHead>Status</TableHead><TableHead className="w-[120px]">Actions</TableHead></TableRow></TableHeader>
