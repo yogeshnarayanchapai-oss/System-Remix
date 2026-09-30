@@ -3,8 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 
 const PAGE_SIZE = 1000;
 
-export const USD_ACCOUNT_BALANCE_HISTORY_QUERY_KEY = ['usd-account-balance-history', 'ledger-report-v1'] as const;
-export const NPR_ACCOUNT_BALANCE_HISTORY_QUERY_KEY = ['npr-account-balance-history', 'ledger-report-v1'] as const;
+export const USD_ACCOUNT_BALANCE_HISTORY_QUERY_KEY = ['usd-account-balance-history', 'ledger-report-v2'] as const;
+export const NPR_ACCOUNT_BALANCE_HISTORY_QUERY_KEY = ['npr-account-balance-history', 'ledger-report-v2'] as const;
 
 async function fetchAllPages<T>(
   fetchPage: (from: number, to: number) => PromiseLike<{
@@ -44,17 +44,22 @@ export interface UsdTransferBalanceAfter {
 export interface UsdAccountLedgerSummary {
   openingBalance: number;
   transactionIncoming: number;
+  transactionIncomingCount: number;
   transactionOutgoing: number;
+  transactionOutgoingCount: number;
   transferIncoming: number;
+  transferIncomingCount: number;
   transferOutgoing: number;
+  transferOutgoingCount: number;
   totalIn: number;
   totalOut: number;
   currentBalance: number;
 }
 
-export function useUsdAccountBalanceHistory() {
+export function useUsdAccountBalanceHistory(enabled = true) {
   return useQuery({
     queryKey: USD_ACCOUNT_BALANCE_HISTORY_QUERY_KEY,
+    enabled,
     staleTime: 30_000,
     queryFn: async () => {
       const [
@@ -93,9 +98,13 @@ export function useUsdAccountBalanceHistory() {
         accountSummaries[account.id] = {
           openingBalance,
           transactionIncoming: 0,
+          transactionIncomingCount: 0,
           transactionOutgoing: 0,
+          transactionOutgoingCount: 0,
           transferIncoming: 0,
+          transferIncomingCount: 0,
           transferOutgoing: 0,
+          transferOutgoingCount: 0,
           totalIn: 0,
           totalOut: 0,
           currentBalance: openingBalance,
@@ -135,8 +144,13 @@ export function useUsdAccountBalanceHistory() {
           balances.set(accountId, balanceAfter);
           const summary = accountSummaries[accountId];
           if (summary) {
-            if (isIncoming) summary.transactionIncoming += amount;
-            else summary.transactionOutgoing += amount;
+            if (isIncoming) {
+              summary.transactionIncoming += amount;
+              summary.transactionIncomingCount += 1;
+            } else {
+              summary.transactionOutgoing += amount;
+              summary.transactionOutgoingCount += 1;
+            }
           }
           transactionBalanceAfter[transaction.id] = balanceAfter;
           continue;
@@ -152,7 +166,10 @@ export function useUsdAccountBalanceHistory() {
           const balanceAfter = currentBalance - deducted;
           balances.set(transfer.from_wallet_id, balanceAfter);
           const summary = accountSummaries[transfer.from_wallet_id];
-          if (summary) summary.transferOutgoing += deducted;
+          if (summary) {
+            summary.transferOutgoing += deducted;
+            summary.transferOutgoingCount += 1;
+          }
           after.from = balanceAfter;
         }
 
@@ -162,7 +179,10 @@ export function useUsdAccountBalanceHistory() {
           const balanceAfter = currentBalance + received;
           balances.set(transfer.to_wallet_id, balanceAfter);
           const summary = accountSummaries[transfer.to_wallet_id];
-          if (summary) summary.transferIncoming += received;
+          if (summary) {
+            summary.transferIncoming += received;
+            summary.transferIncomingCount += 1;
+          }
           after.to = balanceAfter;
         }
 
@@ -188,17 +208,22 @@ export interface NprTransferBalanceAfter {
 export interface NprAccountLedgerSummary {
   openingBalance: number;
   credits: number;
+  creditCount: number;
   debits: number;
+  debitCount: number;
   transferIncoming: number;
+  transferIncomingCount: number;
   transferOutgoing: number;
+  transferOutgoingCount: number;
   totalIn: number;
   totalOut: number;
   currentBalance: number;
 }
 
-export function useNprAccountBalanceHistory() {
+export function useNprAccountBalanceHistory(enabled = true) {
   return useQuery({
     queryKey: NPR_ACCOUNT_BALANCE_HISTORY_QUERY_KEY,
+    enabled,
     staleTime: 30_000,
     queryFn: async () => {
       const [
@@ -229,9 +254,13 @@ export function useNprAccountBalanceHistory() {
         accountSummaries[account.id] = {
           openingBalance,
           credits: 0,
+          creditCount: 0,
           debits: 0,
+          debitCount: 0,
           transferIncoming: 0,
+          transferIncomingCount: 0,
           transferOutgoing: 0,
+          transferOutgoingCount: 0,
           totalIn: 0,
           totalOut: 0,
           currentBalance: openingBalance,
@@ -253,10 +282,19 @@ export function useNprAccountBalanceHistory() {
         balances.set(entry.nepali_account_id, balanceAfter);
         const summary = accountSummaries[entry.nepali_account_id];
         if (summary) {
-          if (entry.entry_type === 'CREDIT') summary.credits += amount;
-          else if (entry.entry_type === 'DEBIT') summary.debits += amount;
-          else if (entry.entry_type === 'TRANSFER_IN') summary.transferIncoming += amount;
-          else if (entry.entry_type === 'TRANSFER_OUT') summary.transferOutgoing += amount;
+          if (entry.entry_type === 'CREDIT') {
+            summary.credits += amount;
+            summary.creditCount += 1;
+          } else if (entry.entry_type === 'DEBIT') {
+            summary.debits += amount;
+            summary.debitCount += 1;
+          } else if (entry.entry_type === 'TRANSFER_IN') {
+            summary.transferIncoming += amount;
+            summary.transferIncomingCount += 1;
+          } else if (entry.entry_type === 'TRANSFER_OUT') {
+            summary.transferOutgoing += amount;
+            summary.transferOutgoingCount += 1;
+          }
         }
 
         if (entry.source_id && (entry.source_type === 'PARTY_RECEIVE' || entry.source_type === 'PARTY_PAY')) {

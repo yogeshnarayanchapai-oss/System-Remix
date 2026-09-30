@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowDownLeft, ArrowUpRight, Wallet, TrendingUp, Calendar, CreditCard, ChevronRight, Mail, Users, Scale, Eye, ArrowUpDown, Layers, ArrowRightLeft, Check, MailX, DollarSign, TrendingDown, Banknote, BookOpen } from 'lucide-react';
 import { format } from 'date-fns';
@@ -14,13 +14,17 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import type { SelectOption } from '@/components/ui/SearchableSelect';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { useDashboardStats, usePaypalSummary, useEmailPerformance, usePartySummary, useEmailsWithNoActivity, useWalletPeriodStats } from '@/hooks/useDashboard';
+import { useDashboardStats, useEmailPerformance, usePartySummary, useEmailsWithNoActivity } from '@/hooks/useDashboard';
 import { useProfitMetrics, useTotalWalletBalance, getDateRange, DateFilterType, DateFilter } from '@/hooks/useProfitMetrics';
 import { useSettleAllParty } from '@/hooks/usePartyTransactions';
-import { useTotalNprBalance } from '@/hooks/useNepaliAccounts';
+import { useNepaliAccounts, useTotalNprBalance } from '@/hooks/useNepaliAccounts';
+import { usePaypalAccounts } from '@/hooks/usePaypalAccounts';
+import { useNprAccountBalanceHistory, useUsdAccountBalanceHistory } from '@/hooks/useAccountBalanceHistory';
 import { useUserRole } from '@/hooks/useUserRole';
 
 import { useSensitiveDataVisibility } from '@/hooks/useSensitiveDataVisibility';
@@ -38,6 +42,8 @@ export default function Dashboard() {
   
   const [hideZeroBalance, setHideZeroBalance] = useState(true);
   const [sortBy, setSortBy] = useState<SortBy>('recent');
+  const [ledgerCurrency, setLedgerCurrency] = useState<'USD' | 'NPR'>('USD');
+  const [selectedLedgerAccountId, setSelectedLedgerAccountId] = useState('');
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showDaybook, setShowDaybook] = useState(false);
@@ -53,10 +59,21 @@ export default function Dashboard() {
   const { isAdmin, isEditor } = useUserRole();
   const { isVisible: showSensitive, MASK } = useSensitiveDataVisibility();
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
-  const { data: walletSummary, isLoading: walletLoading } = usePaypalSummary();
   const { data: partySummary, isLoading: partyLoading } = usePartySummary();
   const settleAll = useSettleAllParty();
   const { totalBalance: totalNprBalance, isLoading: nprBalanceLoading } = useTotalNprBalance();
+  const { data: usdAccounts, isLoading: usdAccountsLoading } = usePaypalAccounts();
+  const { data: nprAccounts, isLoading: nprAccountsLoading } = useNepaliAccounts(false);
+  const {
+    data: usdLedgerHistory,
+    isLoading: usdLedgerLoading,
+    isError: usdLedgerError,
+  } = useUsdAccountBalanceHistory(ledgerCurrency === 'USD' && !!selectedLedgerAccountId);
+  const {
+    data: nprLedgerHistory,
+    isLoading: nprLedgerLoading,
+    isError: nprLedgerError,
+  } = useNprAccountBalanceHistory(ledgerCurrency === 'NPR' && !!selectedLedgerAccountId);
   
   // Get date filter
   const dateFilter: DateFilter = getDateRange(
@@ -70,7 +87,46 @@ export default function Dashboard() {
   
   // Total wallet balance
   const { data: walletBalance, isLoading: walletBalanceLoading } = useTotalWalletBalance();
-  const { data: walletPeriodStats } = useWalletPeriodStats(dateFilter.startDate, dateFilter.endDate);
+
+  const ledgerAccountOptions = useMemo<SelectOption[]>(() => ledgerCurrency === 'USD'
+    ? (usdAccounts || []).map((account) => ({
+        value: account.id,
+        label: account.paypal_name,
+        sublabel: account.is_active ? 'Active wallet' : 'Inactive wallet',
+      }))
+    : (nprAccounts || []).map((account) => ({
+        value: account.id,
+        label: account.name,
+        sublabel: account.status === 'ACTIVE' ? 'Active account' : 'Inactive account',
+      })), [ledgerCurrency, usdAccounts, nprAccounts]);
+
+  const selectedUsdLedgerSummary = ledgerCurrency === 'USD'
+    ? usdLedgerHistory?.accountSummaries[selectedLedgerAccountId]
+    : undefined;
+  const selectedNprLedgerSummary = ledgerCurrency === 'NPR'
+    ? nprLedgerHistory?.accountSummaries[selectedLedgerAccountId]
+    : undefined;
+  const selectedLedgerSummary = selectedUsdLedgerSummary || selectedNprLedgerSummary;
+  const ledgerLoading = ledgerCurrency === 'USD' ? usdLedgerLoading : nprLedgerLoading;
+  const ledgerError = ledgerCurrency === 'USD' ? usdLedgerError : nprLedgerError;
+  const ledgerAccountLoading = ledgerCurrency === 'USD' ? usdAccountsLoading : nprAccountsLoading;
+  const formatLedgerAmount = ledgerCurrency === 'USD' ? formatUSD : formatNPR;
+  const formatVisibleLedgerAmount = (amount: number) => showSensitive ? formatLedgerAmount(amount) : MASK;
+  const ledgerRows = ledgerCurrency === 'USD'
+    ? selectedUsdLedgerSummary ? [
+        { label: 'Incoming transactions', inAmount: selectedUsdLedgerSummary.transactionIncoming, inCount: selectedUsdLedgerSummary.transactionIncomingCount, outAmount: 0, outCount: 0 },
+        { label: 'Outgoing transactions', inAmount: 0, inCount: 0, outAmount: selectedUsdLedgerSummary.transactionOutgoing, outCount: selectedUsdLedgerSummary.transactionOutgoingCount },
+        { label: 'Transfers in', inAmount: selectedUsdLedgerSummary.transferIncoming, inCount: selectedUsdLedgerSummary.transferIncomingCount, outAmount: 0, outCount: 0 },
+        { label: 'Transfers out (including fees)', inAmount: 0, inCount: 0, outAmount: selectedUsdLedgerSummary.transferOutgoing, outCount: selectedUsdLedgerSummary.transferOutgoingCount },
+      ] : []
+    : selectedNprLedgerSummary ? [
+        { label: 'Credits', inAmount: selectedNprLedgerSummary.credits, inCount: selectedNprLedgerSummary.creditCount, outAmount: 0, outCount: 0 },
+        { label: 'Debits', inAmount: 0, inCount: 0, outAmount: selectedNprLedgerSummary.debits, outCount: selectedNprLedgerSummary.debitCount },
+        { label: 'Transfers in', inAmount: selectedNprLedgerSummary.transferIncoming, inCount: selectedNprLedgerSummary.transferIncomingCount, outAmount: 0, outCount: 0 },
+        { label: 'Transfers out', inAmount: 0, inCount: 0, outAmount: selectedNprLedgerSummary.transferOutgoing, outCount: selectedNprLedgerSummary.transferOutgoingCount },
+      ] : [];
+  const totalLedgerInCount = ledgerRows.reduce((sum, row) => sum + row.inCount, 0);
+  const totalLedgerOutCount = ledgerRows.reduce((sum, row) => sum + row.outCount, 0);
 
   // Party summary uses NPR for receivable/payable - default sort by most recent activity
   const filteredPartySummary = partySummary?.filter(p => !hideZeroBalance || (p.receivable > 0 || p.payable > 0))?.sort((a, b) => {
@@ -302,61 +358,149 @@ export default function Dashboard() {
           </div>
         </>
 
-      {/* Wallet Summary - USD - Active wallets with balance > 0, IN/OUT for selected date filter */}
+      {/* Searchable account ledger report - all-time balances and entry totals */}
       <Card className="mb-8">
         <CardHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-3">
             <CreditCard className="h-5 w-5 text-muted-foreground" />
-            <CardTitle className="text-base">Wallet Accounts Summary ({getDateFilterLabel()})</CardTitle>
+            <div>
+              <CardTitle className="text-base">Account Ledger Report</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">All-time totals from the account's full ledger history</p>
+            </div>
           </div>
-          <Link to="/wallets"><Button variant="ghost" size="sm">Manage <ChevronRight className="ml-1 h-4 w-4" /></Button></Link>
+          <Link to="/wallets">
+            <Button variant="ghost" size="sm">Manage <ChevronRight className="ml-1 h-4 w-4" /></Button>
+          </Link>
         </CardHeader>
-        <CardContent>
-          <div className="table-container">
-            <Table>
-              <TableHeader className="table-sticky-header">
-                <TableRow>
-                  <TableHead>Wallet Name</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
-                  <TableHead className="text-right">In</TableHead>
-                  <TableHead className="text-right">Out</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {walletLoading ? (
-                  [...Array(3)].map((_, i) => (
-                    <TableRow key={i}>{[...Array(4)].map((_, j) => (<TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>))}</TableRow>
-                  ))
-                ) : (() => {
-                  const filtered = walletSummary?.filter(a => a.is_active && a.balance > 0) || [];
-                  if (filtered.length === 0) {
-                    return (
-                      <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                        No active wallets with balance.
-                      </TableCell></TableRow>
-                    );
-                  }
-                  return filtered.map((account) => {
-                    const stats = walletPeriodStats?.[account.id];
-                    return (
-                      <TableRow key={account.id}>
-                        <TableCell className="font-medium">{account.paypal_name}</TableCell>
-                        <TableCell className="text-right font-semibold">{showSensitive ? formatUSD(account.balance) : MASK}</TableCell>
-                        <TableCell className="text-right currency-positive text-sm">
-                          <div>{showSensitive ? formatUSD(stats?.in_total || 0) : MASK}</div>
-                          {showSensitive && <div className="text-xs text-muted-foreground">{stats?.in_count || 0} txn</div>}
+        <CardContent className="space-y-5">
+          <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
+            <div className="space-y-2">
+              <Label>Currency</Label>
+              <div className="grid grid-cols-2 gap-2" role="group" aria-label="Account currency">
+                <Button
+                  type="button"
+                  variant={ledgerCurrency === 'USD' ? 'default' : 'outline'}
+                  onClick={() => {
+                    setLedgerCurrency('USD');
+                    setSelectedLedgerAccountId('');
+                  }}
+                >
+                  USD
+                </Button>
+                <Button
+                  type="button"
+                  variant={ledgerCurrency === 'NPR' ? 'default' : 'outline'}
+                  onClick={() => {
+                    setLedgerCurrency('NPR');
+                    setSelectedLedgerAccountId('');
+                  }}
+                >
+                  NPR
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Account</Label>
+              <SearchableSelect
+                options={ledgerAccountOptions}
+                value={selectedLedgerAccountId}
+                onValueChange={setSelectedLedgerAccountId}
+                placeholder={ledgerAccountLoading ? 'Loading accounts...' : 'Search and choose an account'}
+                searchPlaceholder={`Search all ${ledgerCurrency} accounts...`}
+                emptyText={`No ${ledgerCurrency} accounts found.`}
+                disabled={ledgerAccountLoading || ledgerAccountOptions.length === 0}
+              />
+              <p className="text-xs text-muted-foreground">
+                Search includes active and inactive accounts.
+              </p>
+            </div>
+          </div>
+
+          {ledgerError ? (
+            <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+              Could not load the complete account history. Try again later.
+            </div>
+          ) : !selectedLedgerAccountId ? (
+            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+              {ledgerAccountLoading
+                ? 'Loading accounts...'
+                : ledgerAccountOptions.length === 0
+                  ? `No ${ledgerCurrency} accounts available.`
+                  : `Choose a ${ledgerCurrency} account to see its full-history report.`}
+            </div>
+          ) : ledgerLoading ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="rounded-lg border p-4">
+                  <Skeleton className="mb-3 h-4 w-28" />
+                  <Skeleton className="h-7 w-32" />
+                </div>
+              ))}
+            </div>
+          ) : selectedLedgerSummary ? (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  { label: 'Opening balance', amount: selectedLedgerSummary.openingBalance },
+                  { label: 'Total in', amount: selectedLedgerSummary.totalIn },
+                  { label: 'Total out', amount: selectedLedgerSummary.totalOut },
+                  { label: 'Current balance', amount: selectedLedgerSummary.currentBalance },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-lg border bg-card p-4">
+                    <p className="text-sm text-muted-foreground">{item.label}</p>
+                    <p className="mt-2 font-mono text-xl font-semibold">
+                      {formatVisibleLedgerAmount(item.amount)} <span className="text-sm font-normal text-muted-foreground">{ledgerCurrency}</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <h3 className="mb-3 text-sm font-semibold">Totals by ledger type</h3>
+                <div className="table-container">
+                  <Table>
+                    <TableHeader className="table-sticky-header">
+                      <TableRow>
+                        <TableHead>Ledger type</TableHead>
+                        <TableHead className="text-right">In ({ledgerCurrency})</TableHead>
+                        <TableHead className="text-right">Out ({ledgerCurrency})</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {ledgerRows.map((row) => (
+                        <TableRow key={row.label}>
+                          <TableCell>{row.label}</TableCell>
+                          <TableCell className="text-right font-mono text-sm currency-positive">
+                            <div>{formatVisibleLedgerAmount(row.inAmount)}</div>
+                            {showSensitive && <div className="text-xs text-muted-foreground">{row.inCount} {row.inCount === 1 ? 'entry' : 'entries'}</div>}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm currency-negative">
+                            <div>{formatVisibleLedgerAmount(row.outAmount)}</div>
+                            {showSensitive && <div className="text-xs text-muted-foreground">{row.outCount} {row.outCount === 1 ? 'entry' : 'entries'}</div>}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow className="font-semibold">
+                        <TableCell>Total</TableCell>
+                        <TableCell className="text-right font-mono text-sm currency-positive">
+                          <div>{formatVisibleLedgerAmount(selectedLedgerSummary.totalIn)}</div>
+                          {showSensitive && <div className="text-xs text-muted-foreground">{totalLedgerInCount} {totalLedgerInCount === 1 ? 'entry' : 'entries'}</div>}
                         </TableCell>
-                        <TableCell className="text-right currency-negative text-sm">
-                          <div>{showSensitive ? formatUSD(stats?.out_total || 0) : MASK}</div>
-                          {showSensitive && <div className="text-xs text-muted-foreground">{stats?.out_count || 0} txn</div>}
+                        <TableCell className="text-right font-mono text-sm currency-negative">
+                          <div>{formatVisibleLedgerAmount(selectedLedgerSummary.totalOut)}</div>
+                          {showSensitive && <div className="text-xs text-muted-foreground">{totalLedgerOutCount} {totalLedgerOutCount === 1 ? 'entry' : 'entries'}</div>}
                         </TableCell>
                       </TableRow>
-                    );
-                  });
-                })()}
-              </TableBody>
-            </Table>
-          </div>
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+              No account history summary is available for this account.
+            </div>
+          )}
         </CardContent>
       </Card>
 
