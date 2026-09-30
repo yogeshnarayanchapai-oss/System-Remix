@@ -19,6 +19,7 @@ import { CalendarIcon } from 'lucide-react';
 import { useNprTransfers, DatePreset, NprTransfer } from '@/hooks/useNprTransfers';
 import { useNepaliAccounts, useDeleteNprTransfer, useUpdateNprTransfer } from '@/hooks/useNepaliAccounts';
 import { formatNPR } from '@/lib/format';
+import { useNprAccountBalanceHistory } from '@/hooks/useAccountBalanceHistory';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { NepaliAccountSelect } from '@/components/nepali-accounts/NepaliAccountSelect';
 import { toast } from 'sonner';
@@ -58,6 +59,15 @@ export function NprTransfersTab() {
     nepaliAccountId,
     remarkSearch: remarkSearch.trim() || undefined,
   });
+  const {
+    data: nprBalanceHistory,
+    isLoading: nprBalanceHistoryLoading,
+    isError: nprBalanceHistoryError,
+  } = useNprAccountBalanceHistory();
+  const transferBalanceText = (sourceId: string, side: 'from' | 'to') => {
+    const balance = nprBalanceHistory?.transferBalanceAfter[sourceId]?.[side];
+    return balance != null ? formatNPR(balance) : '—';
+  };
 
   const accountOptions = [
     { value: 'all', label: 'All Accounts' },
@@ -282,6 +292,7 @@ export function NprTransfersTab() {
                   <TableHead>From Account</TableHead>
                   <TableHead>To Account</TableHead>
                   <TableHead className="text-right">Amount (NPR)</TableHead>
+                  <TableHead className="text-right">Balance After (NPR)</TableHead>
                   <TableHead>Remark</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
@@ -290,14 +301,14 @@ export function NprTransfersTab() {
                 {isLoading ? (
                   [...Array(5)].map((_, i) => (
                     <TableRow key={i}>
-                      {[...Array(6)].map((_, j) => (
+                      {[...Array(7)].map((_, j) => (
                         <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
                       ))}
                     </TableRow>
                   ))
                 ) : !transfers?.length ? (
                   <TableRow>
-                    <TableCell colSpan={6}>
+                    <TableCell colSpan={7}>
                       <EmptyState
                         icon={<ArrowRightLeft className="h-6 w-6" />}
                         title="No NPR transfers found"
@@ -316,6 +327,22 @@ export function NprTransfersTab() {
                       <TableCell className="font-medium">{transfer.to_account_name}</TableCell>
                       <TableCell className="text-right font-mono">
                         {formatNPR(transfer.amount_npr)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs">
+                        <div className="flex flex-col items-end gap-1">
+                          <div className="flex items-center gap-1">
+                            <span>From:</span>
+                            {!transfer.from_account_id ? '—' : nprBalanceHistoryLoading
+                              ? <Skeleton className="h-4 w-24" />
+                              : nprBalanceHistoryError ? 'Unavailable' : transferBalanceText(transfer.source_id, 'from')}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span>To:</span>
+                            {!transfer.to_account_id ? '—' : nprBalanceHistoryLoading
+                              ? <Skeleton className="h-4 w-24" />
+                              : nprBalanceHistoryError ? 'Unavailable' : transferBalanceText(transfer.source_id, 'to')}
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground max-w-[200px] truncate">
                         {transfer.remark || '-'}

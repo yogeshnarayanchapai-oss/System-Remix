@@ -19,6 +19,7 @@ import { useAllPartyTransactions, fetchAllPartyTransactions, DateQuickFilter, ge
 import { useUpdatePartyTransaction, useDeletePartyTransaction } from '@/hooks/usePartyTransactions';
 import { useParties } from '@/hooks/useParties';
 import { useNepaliAccounts } from '@/hooks/useNepaliAccounts';
+import { useNprAccountBalanceHistory } from '@/hooks/useAccountBalanceHistory';
 import { formatNPR } from '@/lib/format';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { NepaliAccountSelect } from '@/components/nepali-accounts/NepaliAccountSelect';
@@ -79,6 +80,15 @@ export function TransactionsTab({ onViewParty, initialDateFrom, initialDateTo }:
     page: currentPage,
     pageSize: 50,
   });
+  const {
+    data: nprBalanceHistory,
+    isLoading: nprBalanceHistoryLoading,
+    isError: nprBalanceHistoryError,
+  } = useNprAccountBalanceHistory();
+  const partyAccountBalanceText = (transactionId: string) => {
+    const balance = nprBalanceHistory?.partyTransactionBalanceAfter[transactionId];
+    return balance !== undefined ? formatNPR(balance) : '—';
+  };
 
   const updateMutation = useUpdatePartyTransaction();
   const deleteMutation = useDeletePartyTransaction();
@@ -354,6 +364,7 @@ export function TransactionsTab({ onViewParty, initialDateFrom, initialDateTo }:
                 <TableHead>Entry Type</TableHead>
                 <TableHead className="text-right">Amount (NPR)</TableHead>
                 <TableHead>NPR Account</TableHead>
+                <TableHead className="text-right">Balance After (NPR)</TableHead>
                 <TableHead>Remark</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
@@ -362,14 +373,14 @@ export function TransactionsTab({ onViewParty, initialDateFrom, initialDateTo }:
               {isLoading ? (
                 [...Array(5)].map((_, i) => (
                   <TableRow key={i}>
-                    {[...Array(7)].map((_, j) => (
+                    {[...Array(8)].map((_, j) => (
                       <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
                     ))}
                   </TableRow>
                 ))
               ) : transactionsData?.transactions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7}>
+                  <TableCell colSpan={8}>
                     <EmptyState
                       icon={<Filter className="h-6 w-6" />}
                       title="No transactions found"
@@ -401,6 +412,13 @@ export function TransactionsTab({ onViewParty, initialDateFrom, initialDateTo }:
                       <span className={txn.nepali_account_name ? '' : 'text-muted-foreground'}>
                         {txn.nepali_account_name || 'None'}
                       </span>
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {!txn.nepali_account_id ? '—' : nprBalanceHistoryLoading ? (
+                        <Skeleton className="ml-auto h-5 w-24" />
+                      ) : nprBalanceHistoryError ? (
+                        <span title="Could not load NPR account balance">Unavailable</span>
+                      ) : partyAccountBalanceText(txn.id)}
                     </TableCell>
                     <TableCell className="max-w-[200px] truncate" title={txn.remark || ''}>
                       {txn.remark || '-'}

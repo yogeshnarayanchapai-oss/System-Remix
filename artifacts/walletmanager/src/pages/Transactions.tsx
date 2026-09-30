@@ -41,6 +41,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { useTransactions, useDeleteTransaction, useUpdateTransaction } from '@/hooks/useTransactions';
 import { useWalletTransfers, useDeleteWalletTransfer } from '@/hooks/useWalletTransfers';
+import { useUsdAccountBalanceHistory } from '@/hooks/useAccountBalanceHistory';
 import { useActivePaypalAccounts } from '@/hooks/usePaypalAccounts';
 import { useParties } from '@/hooks/useParties';
 import { useSensitiveDataVisibility } from '@/hooks/useSensitiveDataVisibility';
@@ -98,9 +99,25 @@ export default function Transactions() {
     dateTo: dateFilters.dateTo,
   });
   const { data: transfers, isLoading: transfersLoading } = useWalletTransfers();
+  const {
+    data: usdBalanceHistory,
+    isLoading: usdBalanceHistoryLoading,
+    isError: usdBalanceHistoryError,
+  } = useUsdAccountBalanceHistory();
   const { data: walletAccounts } = useActivePaypalAccounts();
   const { data: parties } = useParties();
   const { isVisible: showSensitive, MASK } = useSensitiveDataVisibility();
+
+  const transactionBalanceText = (transactionId: string) => {
+    const balance = usdBalanceHistory?.transactionBalanceAfter[transactionId];
+    if (!showSensitive) return MASK;
+    return balance !== undefined ? formatUSD(balance) : '—';
+  };
+  const transferBalanceText = (transferId: string, side: 'from' | 'to') => {
+    const balance = usdBalanceHistory?.transferBalanceAfter[transferId]?.[side];
+    if (!showSensitive) return MASK;
+    return balance != null ? formatUSD(balance) : '—';
+  };
   
   const updateTransaction = useUpdateTransaction();
   const deleteTransaction = useDeleteTransaction();
@@ -264,14 +281,15 @@ export default function Transactions() {
                     <TableRow>
                       <TableHead>Date</TableHead><TableHead>Party</TableHead><TableHead>Wallet</TableHead><TableHead>Email</TableHead><TableHead>Type</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Balance After (USD)</TableHead>
                       <TableHead className="text-right">Rate</TableHead>
                       <TableHead className="text-right">NPR Total</TableHead>
                       <TableHead>Remark</TableHead><TableHead className="w-[100px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {isLoading ? ([...Array(5)].map((_, i) => (<TableRow key={i}>{[...Array(10)].map((_, j) => (<TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>))}</TableRow>)))
-                    : transactions?.length === 0 ? (<TableRow><TableCell colSpan={10}><EmptyState title="No transactions yet" description="Create your first transaction using the Bulk Transaction button" className="my-8" /></TableCell></TableRow>)
+                    {isLoading ? ([...Array(5)].map((_, i) => (<TableRow key={i}>{[...Array(11)].map((_, j) => (<TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>))}</TableRow>)))
+                    : transactions?.length === 0 ? (<TableRow><TableCell colSpan={11}><EmptyState title="No transactions yet" description="Create your first transaction using the Bulk Transaction button" className="my-8" /></TableCell></TableRow>)
                     : transactions?.map((txn) => (
                       <TableRow key={txn.id}>
                         <TableCell className="whitespace-nowrap">{formatDate(txn.txn_date)}</TableCell>
@@ -280,6 +298,13 @@ export default function Transactions() {
                         <TableCell className="text-sm text-muted-foreground">{txn.paypal_emails?.email || '-'}</TableCell>
                         <TableCell><StatusBadge variant={txn.txn_type === 'INCOMING' ? 'incoming' : 'outgoing'}>{txn.txn_type === 'INCOMING' ? <><ArrowDownLeft className="mr-1 h-3 w-3" /> In</> : <><ArrowUpRight className="mr-1 h-3 w-3" /> Out</>}</StatusBadge></TableCell>
                         <TableCell className="text-right font-mono">{formatUSD(txn.amount)}</TableCell>
+                        <TableCell className="text-right font-mono font-medium">
+                          {!txn.paypal_account_id ? '—' : usdBalanceHistoryLoading ? <Skeleton className="ml-auto h-5 w-20" /> : usdBalanceHistoryError ? (
+                            <span title="Could not load account balance">Unavailable</span>
+                          ) : usdBalanceHistory?.transactionBalanceAfter[txn.id] !== undefined ? (
+                            transactionBalanceText(txn.id)
+                          ) : '—'}
+                        </TableCell>
                         <TableCell className="text-right font-mono text-muted-foreground">{showSensitive ? txn.rate.toFixed(2) : MASK}</TableCell>
                         <TableCell className="text-right font-mono text-muted-foreground">{showSensitive ? formatNumber(txn.total) : MASK}</TableCell>
                         <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">{txn.remark || '-'}</TableCell>
@@ -325,6 +350,7 @@ export default function Transactions() {
                       <TableHead className="text-right">Amount</TableHead>
                       <TableHead className="text-right">Fee</TableHead>
                       <TableHead className="text-right">Total Deducted</TableHead>
+                      <TableHead className="text-right">Balance After (USD)</TableHead>
                       <TableHead>Remark</TableHead>
                       <TableHead className="w-[80px]">Actions</TableHead>
                     </TableRow>
@@ -333,14 +359,14 @@ export default function Transactions() {
                     {transfersLoading ? (
                       [...Array(3)].map((_, i) => (
                         <TableRow key={i}>
-                          {[...Array(8)].map((_, j) => (
+                          {[...Array(9)].map((_, j) => (
                             <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
                           ))}
                         </TableRow>
                       ))
                     ) : transfers?.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8}>
+                        <TableCell colSpan={9}>
                           <EmptyState 
                             icon={<ArrowRightLeft className="h-6 w-6" />}
                             title="No transfers yet"
@@ -371,6 +397,22 @@ export default function Transactions() {
                             </TableCell>
                             <TableCell className="text-right font-mono text-destructive">
                               -{formatUSD(transfer.total)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-xs">
+                              <div className="flex flex-col items-end gap-1">
+                                <div className="flex items-center gap-1">
+                                  <span>From:</span>
+                                  {!transfer.from_wallet_id ? '—' : usdBalanceHistoryLoading
+                                    ? <Skeleton className="h-4 w-20" />
+                                    : usdBalanceHistoryError ? 'Unavailable' : transferBalanceText(transfer.id, 'from')}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span>To:</span>
+                                  {!transfer.to_wallet_id ? '—' : usdBalanceHistoryLoading
+                                    ? <Skeleton className="h-4 w-20" />
+                                    : usdBalanceHistoryError ? 'Unavailable' : transferBalanceText(transfer.id, 'to')}
+                                </div>
+                              </div>
                             </TableCell>
                             <TableCell className="text-muted-foreground max-w-[150px] truncate">
                               {transfer.remark || '-'}

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from './useAuth';
+import { NPR_ACCOUNT_BALANCE_HISTORY_QUERY_KEY } from './useAccountBalanceHistory';
 
 export type NepaliAccountStatus = 'ACTIVE' | 'INACTIVE';
 
@@ -120,6 +121,7 @@ export function useCreateNepaliAccount() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nepali-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['nepali-accounts-with-balances'] });
+      queryClient.invalidateQueries({ queryKey: NPR_ACCOUNT_BALANCE_HISTORY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['user-activity-logs'] });
       toast.success('Nepali Account created successfully');
     },
@@ -173,6 +175,7 @@ export function useUpdateNepaliAccount() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nepali-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['nepali-accounts-with-balances'] });
+      queryClient.invalidateQueries({ queryKey: NPR_ACCOUNT_BALANCE_HISTORY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['user-activity-logs'] });
       toast.success('Nepali Account updated successfully');
     },
@@ -218,6 +221,7 @@ export function useDeleteNepaliAccount() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nepali-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['nepali-accounts-with-balances'] });
+      queryClient.invalidateQueries({ queryKey: NPR_ACCOUNT_BALANCE_HISTORY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['user-activity-logs'] });
       toast.success('Nepali Account deleted successfully');
     },
@@ -251,6 +255,7 @@ export function useCreateNepaliLedgerEntry() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nepali-accounts-with-balances'] });
+      queryClient.invalidateQueries({ queryKey: NPR_ACCOUNT_BALANCE_HISTORY_QUERY_KEY });
     },
     onError: (error) => {
       toast.error('Failed to create ledger entry', { description: error.message });
@@ -334,6 +339,7 @@ export function useCreateNprTransfer() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nepali-accounts-with-balances'] });
+      queryClient.invalidateQueries({ queryKey: NPR_ACCOUNT_BALANCE_HISTORY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['npr-transfers'] });
       queryClient.invalidateQueries({ queryKey: ['user-activity-logs'] });
       toast.success('NPR Transfer completed successfully');
@@ -424,6 +430,7 @@ export function useUpdateNprTransfer() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nepali-accounts-with-balances'] });
+      queryClient.invalidateQueries({ queryKey: NPR_ACCOUNT_BALANCE_HISTORY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['npr-transfers'] });
       queryClient.invalidateQueries({ queryKey: ['user-activity-logs'] });
       toast.success('NPR Transfer updated successfully');
@@ -463,6 +470,7 @@ export function useDeleteNprTransfer() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nepali-accounts-with-balances'] });
+      queryClient.invalidateQueries({ queryKey: NPR_ACCOUNT_BALANCE_HISTORY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['npr-transfers'] });
       queryClient.invalidateQueries({ queryKey: ['user-activity-logs'] });
       toast.success('NPR Transfer deleted successfully');

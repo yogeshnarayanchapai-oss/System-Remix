@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from './useAuth';
+import { USD_ACCOUNT_BALANCE_HISTORY_QUERY_KEY } from './useAccountBalanceHistory';
 
 export interface WalletTransfer {
   id: string;
@@ -37,7 +38,8 @@ export function useWalletTransfers(filters: TransferFilters = {}) {
           to_wallet:paypal_accounts!wallet_transfers_to_wallet_id_fkey(id, paypal_name)
         `)
         .order('transfer_date', { ascending: false })
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false });
 
       if (filters.dateFrom) {
         query = query.gte('transfer_date', filters.dateFrom);
@@ -118,6 +120,7 @@ export function useCreateWalletTransfer() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wallet-transfers'] });
+      queryClient.invalidateQueries({ queryKey: USD_ACCOUNT_BALANCE_HISTORY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['user-activity-logs'] });
@@ -156,6 +159,7 @@ export function useDeleteWalletTransfer() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wallet-transfers'] });
+      queryClient.invalidateQueries({ queryKey: USD_ACCOUNT_BALANCE_HISTORY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['user-activity-logs'] });

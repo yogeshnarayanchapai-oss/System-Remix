@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { 
   BarChart3, 
   Mail, 
   CreditCard,
+  Wallet,
   Calendar,
   ArrowDownLeft,
   ArrowUpRight,
@@ -19,6 +20,8 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import type { SelectOption } from '@/components/ui/SearchableSelect';
 import { 
   useEmailPerformance, 
   usePaypalSummary,
@@ -26,8 +29,11 @@ import {
 } from '@/hooks/useDashboard';
 import { PartyAnalytics } from '@/components/reports/PartyAnalytics';
 import { useTransactions } from '@/hooks/useTransactions';
+import { usePaypalAccounts } from '@/hooks/usePaypalAccounts';
+import { useNepaliAccounts } from '@/hooks/useNepaliAccounts';
+import { useNprAccountBalanceHistory, useUsdAccountBalanceHistory } from '@/hooks/useAccountBalanceHistory';
 import { useSensitiveDataVisibility } from '@/hooks/useSensitiveDataVisibility';
-import { formatUSD } from '@/lib/format';
+import { formatNPR, formatUSD } from '@/lib/format';
 import {
   BarChart,
   Bar,
@@ -42,6 +48,8 @@ import {
 type InactiveDatePreset = '7' | '15' | '30' | 'custom';
 
 export default function Reports() {
+  const [accountCurrency, setAccountCurrency] = useState<'USD' | 'NPR'>('USD');
+  const [selectedAccountId, setSelectedAccountId] = useState('');
   const [emailDays, setEmailDays] = useState<7 | 30>(7);
   const [inactivePreset, setInactivePreset] = useState<InactiveDatePreset>('30');
   const [inactiveDateFrom, setInactiveDateFrom] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
@@ -60,8 +68,51 @@ export default function Reports() {
   const { data: emailPerformance7d, isLoading: email7dLoading } = useEmailPerformance(7);
   const { data: emailPerformance30d, isLoading: email30dLoading } = useEmailPerformance(30);
   const { data: paypalSummary, isLoading: paypalLoading } = usePaypalSummary();
+  const { data: paypalAccounts, isLoading: usdAccountsLoading } = usePaypalAccounts();
+  const { data: nepaliAccounts, isLoading: nprAccountsLoading } = useNepaliAccounts(false);
+  const { data: usdAccountHistory, isLoading: usdHistoryLoading, isError: usdHistoryError } = useUsdAccountBalanceHistory();
+  const { data: nprAccountHistory, isLoading: nprHistoryLoading, isError: nprHistoryError } = useNprAccountBalanceHistory();
   const { data: inactiveEmails, isLoading: inactiveLoading } = useEmailsWithNoActivity(inactiveDateFrom, inactiveDateTo);
   const { isVisible: showSensitive, MASK } = useSensitiveDataVisibility();
+
+  const accountOptions = useMemo<SelectOption[]>(() => accountCurrency === 'USD'
+    ? (paypalAccounts || []).map((account) => ({
+        value: account.id,
+        label: account.paypal_name,
+        sublabel: account.is_active ? 'Active wallet' : 'Inactive wallet',
+        tag: account.tag || undefined,
+      }))
+    : (nepaliAccounts || []).map((account) => ({
+        value: account.id,
+        label: account.name,
+        sublabel: account.status === 'ACTIVE' ? 'Active account' : 'Inactive account',
+      })), [accountCurrency, paypalAccounts, nepaliAccounts]);
+
+  const selectedUsdSummary = accountCurrency === 'USD'
+    ? usdAccountHistory?.accountSummaries[selectedAccountId]
+    : undefined;
+  const selectedNprSummary = accountCurrency === 'NPR'
+    ? nprAccountHistory?.accountSummaries[selectedAccountId]
+    : undefined;
+  const selectedAccountSummary = selectedUsdSummary || selectedNprSummary;
+  const accountHistoryLoading = accountCurrency === 'USD' ? usdHistoryLoading : nprHistoryLoading;
+  const accountHistoryError = accountCurrency === 'USD' ? usdHistoryError : nprHistoryError;
+  const accountListLoading = accountCurrency === 'USD' ? usdAccountsLoading : nprAccountsLoading;
+  const formatAccountAmount = accountCurrency === 'USD' ? formatUSD : formatNPR;
+  const formatReportAmount = (amount: number) => showSensitive ? formatAccountAmount(amount) : MASK;
+  const accountLedgerRows = accountCurrency === 'USD'
+    ? selectedUsdSummary ? [
+        { label: 'Incoming transactions', inAmount: selectedUsdSummary.transactionIncoming, outAmount: 0 },
+        { label: 'Outgoing transactions', inAmount: 0, outAmount: selectedUsdSummary.transactionOutgoing },
+        { label: 'Transfers in', inAmount: selectedUsdSummary.transferIncoming, outAmount: 0 },
+        { label: 'Transfers out (including fees)', inAmount: 0, outAmount: selectedUsdSummary.transferOutgoing },
+      ] : []
+    : selectedNprSummary ? [
+        { label: 'Credits', inAmount: selectedNprSummary.credits, outAmount: 0 },
+        { label: 'Debits', inAmount: 0, outAmount: selectedNprSummary.debits },
+        { label: 'Transfers in', inAmount: selectedNprSummary.transferIncoming, outAmount: 0 },
+        { label: 'Transfers out', inAmount: 0, outAmount: selectedNprSummary.transferOutgoing },
+      ] : [];
   
   // Get last 30 days of transactions for daily chart
   const thirtyDaysAgo = format(subDays(new Date(), 30), 'yyyy-MM-dd');
@@ -112,6 +163,7 @@ export default function Reports() {
       {/* Quick jump nav */}
       <div className="mb-4 flex flex-wrap gap-2">
         {[
+          { id: 'account-ledger', label: 'Account Ledger' },
           { id: 'parties', label: 'Parties' },
           { id: 'wallets', label: 'Wallets' },
           { id: 'daily', label: 'Daily' },
@@ -127,6 +179,147 @@ export default function Reports() {
           </button>
         ))}
       </div>
+
+      {/* All-time account ledger report */}
+      <Card id="section-account-ledger" className="mb-6 scroll-mt-20">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <Wallet className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <CardTitle className="text-base">Account Ledger Report</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Search all accounts and review full-history totals
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)]">
+            <div className="space-y-2">
+              <Label>Currency</Label>
+              <div className="grid grid-cols-2 gap-2" role="group" aria-label="Account currency">
+                <Button
+                  type="button"
+                  variant={accountCurrency === 'USD' ? 'default' : 'outline'}
+                  onClick={() => {
+                    setAccountCurrency('USD');
+                    setSelectedAccountId('');
+                  }}
+                >
+                  USD
+                </Button>
+                <Button
+                  type="button"
+                  variant={accountCurrency === 'NPR' ? 'default' : 'outline'}
+                  onClick={() => {
+                    setAccountCurrency('NPR');
+                    setSelectedAccountId('');
+                  }}
+                >
+                  NPR
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Account</Label>
+              <SearchableSelect
+                options={accountOptions}
+                value={selectedAccountId}
+                onValueChange={setSelectedAccountId}
+                placeholder={accountListLoading ? 'Loading accounts...' : 'Search and choose an account'}
+                searchPlaceholder={`Search all ${accountCurrency} accounts...`}
+                emptyText={`No ${accountCurrency} accounts found.`}
+                disabled={accountListLoading || accountOptions.length === 0}
+              />
+              <p className="text-xs text-muted-foreground">
+                Search includes active and inactive accounts.
+              </p>
+            </div>
+          </div>
+
+          {accountHistoryError ? (
+            <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+              Could not load the complete account history. Try again later.
+            </div>
+          ) : !selectedAccountId ? (
+            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+              {accountListLoading
+                ? 'Loading accounts...'
+                : accountOptions.length === 0
+                  ? `No ${accountCurrency} accounts available.`
+                  : `Choose a ${accountCurrency} account to see its full-history report.`}
+            </div>
+          ) : accountHistoryLoading ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="rounded-lg border p-4">
+                  <Skeleton className="mb-3 h-4 w-28" />
+                  <Skeleton className="h-7 w-32" />
+                </div>
+              ))}
+            </div>
+          ) : selectedAccountSummary ? (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  { label: 'Opening balance', amount: selectedAccountSummary.openingBalance },
+                  { label: 'Total in', amount: selectedAccountSummary.totalIn },
+                  { label: 'Total out', amount: selectedAccountSummary.totalOut },
+                  { label: 'Current balance', amount: selectedAccountSummary.currentBalance },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-lg border bg-card p-4">
+                    <p className="text-sm text-muted-foreground">{item.label}</p>
+                    <p className="mt-2 font-mono text-xl font-semibold">
+                      {formatReportAmount(item.amount)} <span className="text-sm font-normal text-muted-foreground">{accountCurrency}</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <h3 className="mb-3 text-sm font-semibold">Totals by ledger type</h3>
+                <div className="table-container">
+                  <Table>
+                    <TableHeader className="table-sticky-header">
+                      <TableRow>
+                        <TableHead>Ledger type</TableHead>
+                        <TableHead className="text-right">In ({accountCurrency})</TableHead>
+                        <TableHead className="text-right">Out ({accountCurrency})</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {accountLedgerRows.map((row) => (
+                        <TableRow key={row.label}>
+                          <TableCell>{row.label}</TableCell>
+                          <TableCell className="text-right font-mono currency-positive">
+                            {formatReportAmount(row.inAmount)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono currency-negative">
+                            {formatReportAmount(row.outAmount)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow className="font-semibold">
+                        <TableCell>Total</TableCell>
+                        <TableCell className="text-right font-mono currency-positive">
+                          {formatReportAmount(selectedAccountSummary.totalIn)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono currency-negative">
+                          {formatReportAmount(selectedAccountSummary.totalOut)}
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+              No account history summary is available for this account.
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* High Value Customer Analytics */}
       <div id="section-parties" className="scroll-mt-20">

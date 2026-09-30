@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PaypalAccount } from '@/lib/types';
 import { toast } from 'sonner';
 import { useAuth } from './useAuth';
+import { USD_ACCOUNT_BALANCE_HISTORY_QUERY_KEY } from './useAccountBalanceHistory';
 
 export function usePaypalAccounts() {
   return useQuery({
@@ -94,6 +95,7 @@ export function useCreatePaypalAccount() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['paypal-accounts'] });
+      queryClient.invalidateQueries({ queryKey: USD_ACCOUNT_BALANCE_HISTORY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['user-activity-logs'] });
       toast.success('Wallet account created');
@@ -157,6 +159,7 @@ export function useUpdatePaypalAccount() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['paypal-accounts'] });
+      queryClient.invalidateQueries({ queryKey: USD_ACCOUNT_BALANCE_HISTORY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['user-activity-logs'] });
       toast.success('Wallet account updated');
@@ -181,6 +184,7 @@ export function useDeletePaypalAccount() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['paypal-accounts'] });
+      queryClient.invalidateQueries({ queryKey: USD_ACCOUNT_BALANCE_HISTORY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       toast.success('Wallet account deleted');
     },

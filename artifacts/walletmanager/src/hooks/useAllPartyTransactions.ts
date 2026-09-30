@@ -48,7 +48,8 @@ export function useAllPartyTransactions(filters: TransactionFilters) {
           nepali_accounts(name)
         `, { count: 'exact' })
         .order('entry_date', { ascending: false })
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false });
 
       // Apply filters
       if (dateFrom) {
@@ -127,7 +128,8 @@ export async function fetchAllPartyTransactions(
         nepali_accounts(name)
       `)
       .order('entry_date', { ascending: false })
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false });
 
     if (filters.dateFrom) query = query.gte('entry_date', filters.dateFrom);
     if (filters.dateTo) query = query.lte('entry_date', filters.dateTo);

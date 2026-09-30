@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from './useAuth';
+import { NPR_ACCOUNT_BALANCE_HISTORY_QUERY_KEY } from './useAccountBalanceHistory';
 
 export type PartyEntryType = 'INCOMING' | 'OUTGOING';
 
@@ -121,6 +122,7 @@ export function useCreatePartyTransaction() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['party-transactions'] });
+      queryClient.invalidateQueries({ queryKey: NPR_ACCOUNT_BALANCE_HISTORY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['nepali-accounts-with-balances'] });
       queryClient.invalidateQueries({ queryKey: ['user-activity-logs'] });
@@ -226,6 +228,7 @@ export function useSettleAllParty() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['party-transactions'] });
+      queryClient.invalidateQueries({ queryKey: NPR_ACCOUNT_BALANCE_HISTORY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['nepali-accounts-with-balances'] });
       toast.success('All settled successfully');
@@ -305,6 +308,7 @@ export function useUpdatePartyTransaction() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['party-transactions'] });
+      queryClient.invalidateQueries({ queryKey: NPR_ACCOUNT_BALANCE_HISTORY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['all-party-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['nepali-accounts-with-balances'] });
@@ -351,6 +355,7 @@ export function useDeletePartyTransaction() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['party-transactions'] });
+      queryClient.invalidateQueries({ queryKey: NPR_ACCOUNT_BALANCE_HISTORY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['all-party-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['user-activity-logs'] });

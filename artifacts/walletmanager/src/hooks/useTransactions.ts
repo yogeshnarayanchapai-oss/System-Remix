@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Transaction, TxnType } from '@/lib/types';
 import { toast } from 'sonner';
 import { useAuth } from './useAuth';
+import { USD_ACCOUNT_BALANCE_HISTORY_QUERY_KEY } from './useAccountBalanceHistory';
 
 interface TransactionFilters {
   dateFrom?: string;
@@ -27,7 +28,8 @@ export function useTransactions(filters: TransactionFilters = {}) {
           paypal_emails(*)
         `)
         .order('txn_date', { ascending: false })
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false });
       
       if (filters.dateFrom) {
         query = query.gte('txn_date', filters.dateFrom);
@@ -135,6 +137,7 @@ export function useCreateTransaction() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: USD_ACCOUNT_BALANCE_HISTORY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['user-activity-logs'] });
       toast.success('Transaction saved');
@@ -170,6 +173,7 @@ export function useCreateBulkTransactions() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: USD_ACCOUNT_BALANCE_HISTORY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       toast.success(`${data.length} transactions saved`);
     },
@@ -289,6 +293,7 @@ export function useUpdateTransaction() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: USD_ACCOUNT_BALANCE_HISTORY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['party-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['party-ledger-summary'] });
@@ -393,6 +398,7 @@ export function useDeleteTransaction() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: USD_ACCOUNT_BALANCE_HISTORY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['party-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['party-ledger-summary'] });

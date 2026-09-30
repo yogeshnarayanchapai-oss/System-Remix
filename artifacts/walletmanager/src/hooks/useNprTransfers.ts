@@ -4,12 +4,14 @@ import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, subMonths, par
 
 export interface NprTransfer {
   id: string;
+  source_id: string;
   from_account_id: string | null;
   from_account_name: string;
   to_account_id: string | null;
   to_account_name: string;
   amount_npr: number;
   transfer_date: string;
+  created_at: string;
   remark: string | null;
 }
 
@@ -52,7 +54,7 @@ export function useNprTransfers(params: UseNprTransfersParams) {
   const { datePreset, customDateFrom, customDateTo, nepaliAccountId, remarkSearch } = params;
 
   return useQuery({
-    queryKey: ['npr-transfers', datePreset, customDateFrom, customDateTo, nepaliAccountId, remarkSearch],
+    queryKey: ['npr-transfers', 'with-source-id', datePreset, customDateFrom, customDateTo, nepaliAccountId, remarkSearch],
     queryFn: async () => {
       const { from, to } = getDateRange(datePreset, customDateFrom, customDateTo);
       const fromStr = from.toISOString().split('T')[0];
@@ -67,7 +69,8 @@ export function useNprTransfers(params: UseNprTransfersParams) {
         .gte('entry_date', fromStr)
         .lte('entry_date', toStr)
         .order('entry_date', { ascending: false })
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false });
 
       if (remarkSearch) {
         outQuery = outQuery.ilike('remark', `%${remarkSearch}%`);
@@ -82,7 +85,8 @@ export function useNprTransfers(params: UseNprTransfersParams) {
         .gte('entry_date', fromStr)
         .lte('entry_date', toStr)
         .order('entry_date', { ascending: false })
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false });
 
       if (remarkSearch) {
         inQuery = inQuery.ilike('remark', `%${remarkSearch}%`);
@@ -122,12 +126,14 @@ export function useNprTransfers(params: UseNprTransfersParams) {
         if (inEntry) {
           transfers.push({
             id: outEntry.id,
+            source_id: sourceId,
             from_account_id: outEntry.nepali_account_id,
             from_account_name: accountMap.get(outEntry.nepali_account_id) || 'Unknown',
             to_account_id: inEntry.nepali_account_id,
             to_account_name: accountMap.get(inEntry.nepali_account_id) || 'Unknown',
             amount_npr: Number(outEntry.amount_npr),
             transfer_date: outEntry.entry_date,
+            created_at: outEntry.created_at,
             remark: outEntry.remark,
           });
           usedSourceIds.add(sourceId);
@@ -139,12 +145,14 @@ export function useNprTransfers(params: UseNprTransfersParams) {
         if (!usedSourceIds.has(sourceId)) {
           transfers.push({
             id: outEntry.id,
+            source_id: sourceId,
             from_account_id: outEntry.nepali_account_id,
             from_account_name: accountMap.get(outEntry.nepali_account_id) || 'Unknown',
             to_account_id: null,
             to_account_name: 'None',
             amount_npr: Number(outEntry.amount_npr),
             transfer_date: outEntry.entry_date,
+            created_at: outEntry.created_at,
             remark: outEntry.remark,
           });
         }
@@ -155,19 +163,23 @@ export function useNprTransfers(params: UseNprTransfersParams) {
         if (!usedSourceIds.has(sourceId)) {
           transfers.push({
             id: inEntry.id,
+            source_id: sourceId,
             from_account_id: null,
             from_account_name: 'None',
             to_account_id: inEntry.nepali_account_id,
             to_account_name: accountMap.get(inEntry.nepali_account_id) || 'Unknown',
             amount_npr: Number(inEntry.amount_npr),
             transfer_date: inEntry.entry_date,
+            created_at: inEntry.created_at,
             remark: inEntry.remark,
           });
         }
       }
 
       // Sort by date desc
-      transfers.sort((a, b) => b.transfer_date.localeCompare(a.transfer_date));
+      transfers.sort((a, b) => b.transfer_date.localeCompare(a.transfer_date)
+        || b.created_at.localeCompare(a.created_at)
+        || b.source_id.localeCompare(a.source_id));
 
       // Filter by account if specified
       if (nepaliAccountId && nepaliAccountId !== 'all') {
