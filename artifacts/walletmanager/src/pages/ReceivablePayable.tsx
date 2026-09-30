@@ -7,7 +7,6 @@ import {
   Eye,
   AlertTriangle,
   FileText,
-  ArrowRightLeft
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -25,7 +24,6 @@ import { formatNPR } from '@/lib/format';
 import { PartySummary } from '@/lib/types';
 import { PartyLedgerModal } from '@/components/party/PartyLedgerModal';
 import { TransactionsTab } from '@/components/receivable-payable/TransactionsTab';
-import { NprTransfersTab } from '@/components/receivable-payable/NprTransfersTab';
 
 export default function ReceivablePayable() {
   const [searchParams] = useSearchParams();
@@ -102,13 +100,9 @@ export default function ReceivablePayable() {
             <Scale className="h-4 w-4" />
             Summary
           </TabsTrigger>
-          <TabsTrigger value="transactions" className="gap-2">
+          <TabsTrigger value="activity" className="gap-2">
             <FileText className="h-4 w-4" />
-            Transactions
-          </TabsTrigger>
-          <TabsTrigger value="transfers" className="gap-2">
-            <ArrowRightLeft className="h-4 w-4" />
-            Transfer
+            Activity
           </TabsTrigger>
         </TabsList>
 
@@ -235,7 +229,7 @@ export default function ReceivablePayable() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="transactions">
+        <TabsContent value="activity">
           <TransactionsTab
             onViewParty={handleViewParty}
             initialDateFrom={searchParams.get('dateFrom') || undefined}
@@ -243,9 +237,6 @@ export default function ReceivablePayable() {
           />
         </TabsContent>
 
-        <TabsContent value="transfers">
-          <NprTransfersTab />
-        </TabsContent>
       </Tabs>
 
       {/* Party Ledger Modal */}

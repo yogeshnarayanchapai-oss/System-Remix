@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
-import { format, subDays, startOfDay } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { 
   Search, 
   Download, 
@@ -13,7 +13,6 @@ import {
   Trash2,
   ArrowRightLeft,
   Layers,
-  Plus,
   MoreHorizontal,
   CalendarIcon
 } from 'lucide-react';
@@ -34,7 +33,6 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -46,7 +44,7 @@ import { useActivePaypalAccounts } from '@/hooks/usePaypalAccounts';
 import { useParties } from '@/hooks/useParties';
 import { useSensitiveDataVisibility } from '@/hooks/useSensitiveDataVisibility';
 import { formatDate, formatUSD, formatNumber } from '@/lib/format';
-import { TxnType, Transaction } from '@/lib/types';
+import { Transaction } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { BulkTransactionModal } from '@/components/transactions/BulkTransactionModal';
 import { TransferModal } from '@/components/transfers/TransferModal';
@@ -55,8 +53,7 @@ export default function Transactions() {
   const [searchParams] = useSearchParams();
   const initialDateFrom = searchParams.get('dateFrom');
   const initialDateTo = searchParams.get('dateTo');
-  const [activeTab, setActiveTab] = useState('transactions');
-  const [txnSubTab, setTxnSubTab] = useState<'incoming' | 'outgoing'>('incoming');
+  const [activityType, setActivityType] = useState<'ALL' | 'INCOMING' | 'OUTGOING' | 'TRANSFER'>('ALL');
   const [search, setSearch] = useState('');
   const [walletFilter, setWalletFilter] = useState<string>('ALL');
   const [partyFilter, setPartyFilter] = useState<string>('ALL');
@@ -91,14 +88,16 @@ export default function Transactions() {
   const [deleteTransferId, setDeleteTransferId] = useState<string | null>(null);
 
   const { data: transactions, isLoading } = useTransactions({
-    txnType: txnSubTab === 'incoming' ? 'INCOMING' : 'OUTGOING',
     paypalAccountId: walletFilter === 'ALL' ? undefined : walletFilter,
     partyId: partyFilter === 'ALL' ? undefined : partyFilter,
-    search,
     dateFrom: dateFilters.dateFrom,
     dateTo: dateFilters.dateTo,
   });
-  const { data: transfers, isLoading: transfersLoading } = useWalletTransfers();
+  const { data: transfers, isLoading: transfersLoading } = useWalletTransfers({
+    dateFrom: dateFilters.dateFrom,
+    dateTo: dateFilters.dateTo,
+    walletId: walletFilter === 'ALL' ? undefined : walletFilter,
+  });
   const {
     data: usdBalanceHistory,
     isLoading: usdBalanceHistoryLoading,
@@ -107,6 +106,56 @@ export default function Transactions() {
   const { data: walletAccounts } = useActivePaypalAccounts();
   const { data: parties } = useParties();
   const { isVisible: showSensitive, MASK } = useSensitiveDataVisibility();
+
+  type ActivityRow =
+    | { kind: 'transaction'; activityDate: string; createdAt: string; id: string; transaction: Transaction }
+    | { kind: 'transfer'; activityDate: string; createdAt: string; id: string; transfer: NonNullable<typeof transfers>[number] };
+
+  const activityRows = useMemo<ActivityRow[]>(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    const transactionRows: ActivityRow[] = (transactions || [])
+      .filter((txn) => activityType === 'ALL' || activityType === txn.txn_type)
+      .filter((txn) => !normalizedSearch || [
+        txn.parties?.party_name,
+        txn.paypal_accounts?.paypal_name,
+        txn.paypal_emails?.email,
+        txn.remark,
+        txn.reference_id,
+        txn.amount,
+        txn.rate,
+        txn.total,
+      ].some((value) => String(value ?? '').toLowerCase().includes(normalizedSearch)))
+      .map((transaction) => ({
+        kind: 'transaction',
+        activityDate: transaction.txn_date,
+        createdAt: transaction.created_at,
+        id: transaction.id,
+        transaction,
+      }));
+    const transferRows: ActivityRow[] = (transfers || [])
+      .filter(() => partyFilter === 'ALL')
+      .filter(() => activityType === 'ALL' || activityType === 'TRANSFER')
+      .filter((transfer) => !normalizedSearch || [
+        transfer.from_wallet?.paypal_name,
+        transfer.to_wallet?.paypal_name,
+        transfer.remark,
+        transfer.amount,
+        transfer.fee,
+        transfer.total,
+      ].some((value) => String(value ?? '').toLowerCase().includes(normalizedSearch)))
+      .map((transfer) => ({
+        kind: 'transfer',
+        activityDate: transfer.transfer_date,
+        createdAt: transfer.created_at,
+        id: transfer.id,
+        transfer,
+      }));
+    return [...transactionRows, ...transferRows].sort((a, b) =>
+      b.activityDate.localeCompare(a.activityDate)
+      || b.createdAt.localeCompare(a.createdAt)
+      || b.id.localeCompare(a.id)
+    );
+  }, [transactions, transfers, activityType, search, partyFilter]);
 
   const transactionBalanceText = (transactionId: string) => {
     const balance = usdBalanceHistory?.transactionBalanceAfter[transactionId];
@@ -159,9 +208,11 @@ export default function Transactions() {
   };
 
   const exportCSV = () => {
-    if (!transactions?.length) return;
-    const headers = ['Date', 'Party', 'Wallet', 'Email', 'Type', 'Amount', 'Rate', 'Total (NPR)', 'Remark'];
-    const rows = transactions.map(txn => [txn.txn_date, txn.parties?.party_name || '', txn.paypal_accounts?.paypal_name || '', txn.paypal_emails?.email || '', txn.txn_type, txn.amount, txn.rate, txn.total, txn.remark || '']);
+    if (!activityRows.length) return;
+    const headers = ['Date', 'Activity', 'Party', 'From / Wallet', 'To / Email', 'Amount (USD)', 'Details', 'Remark'];
+    const rows = activityRows.map((row) => row.kind === 'transaction'
+      ? [row.transaction.txn_date, row.transaction.txn_type, row.transaction.parties?.party_name || '', row.transaction.paypal_accounts?.paypal_name || '', row.transaction.paypal_emails?.email || '', row.transaction.amount, `Rate: ${row.transaction.rate}; NPR Total: ${row.transaction.total}`, row.transaction.remark || '']
+      : [row.transfer.transfer_date, 'TRANSFER', '', row.transfer.from_wallet?.paypal_name || 'None', row.transfer.to_wallet?.paypal_name || 'None', row.transfer.amount, `Fee: ${row.transfer.fee}; Total Deducted: ${row.transfer.total}`, row.transfer.remark || '']);
     const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -185,35 +236,15 @@ export default function Transactions() {
         }
       />
 
-      {/* Tabs for Transactions and Transfers */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <TabsList>
-          <TabsTrigger value="transactions">Transactions</TabsTrigger>
-          <TabsTrigger value="transfers">Transfers</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="transactions" className="mt-6">
-          {/* Incoming/Outgoing Sub-Tabs */}
-          <Tabs value={txnSubTab} onValueChange={(v) => setTxnSubTab(v as 'incoming' | 'outgoing')} className="mb-4">
-            <TabsList>
-              <TabsTrigger value="incoming">
-                <ArrowDownLeft className="mr-2 h-4 w-4" />
-                Incoming
-              </TabsTrigger>
-              <TabsTrigger value="outgoing">
-                <ArrowUpRight className="mr-2 h-4 w-4" />
-                Outgoing
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-
+      <div className="mb-6">
           {/* Filters */}
           <Card className="mb-6">
             <CardContent className="pt-6">
               <div className="flex flex-wrap items-end gap-4">
-                <div className="form-field min-w-[200px] flex-1"><Label>Search</Label><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input placeholder="Search party, email, remark..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" /></div></div>
+                 <div className="form-field min-w-[200px] flex-1"><Label>Search</Label><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input placeholder="Search party, wallet, remark, amount..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" /></div></div>
                 <div className="form-field min-w-[180px]"><Label>Wallet</Label><Select value={walletFilter} onValueChange={setWalletFilter}><SelectTrigger className="bg-background"><SelectValue /></SelectTrigger><SelectContent className="bg-popover"><SelectItem value="ALL">All Wallets</SelectItem>{walletAccounts?.map((account) => (<SelectItem key={account.id} value={account.id}>{account.paypal_name}{(account as any).tag && <span className="ml-1.5 text-[10px] font-medium text-pink-600 dark:text-pink-400">{(account as any).tag}</span>}</SelectItem>))}</SelectContent></Select></div>
                 <div className="form-field min-w-[180px]"><Label>Party</Label><Select value={partyFilter} onValueChange={setPartyFilter}><SelectTrigger className="bg-background"><SelectValue /></SelectTrigger><SelectContent className="bg-popover"><SelectItem value="ALL">All Parties</SelectItem>{parties?.map((party) => (<SelectItem key={party.id} value={party.id}>{party.party_name}</SelectItem>))}</SelectContent></Select></div>
+                 <div className="form-field min-w-[160px]"><Label>Activity</Label><Select value={activityType} onValueChange={(value) => setActivityType(value as typeof activityType)}><SelectTrigger className="bg-background"><SelectValue /></SelectTrigger><SelectContent className="bg-popover"><SelectItem value="ALL">All Activity</SelectItem><SelectItem value="INCOMING">Incoming</SelectItem><SelectItem value="OUTGOING">Outgoing</SelectItem><SelectItem value="TRANSFER">Transfers</SelectItem></SelectContent></Select></div>
                 <div className="form-field min-w-[180px]">
                   <Label>Date</Label>
                   <div className="flex items-center gap-1">
@@ -267,7 +298,7 @@ export default function Transactions() {
                     </div>
                   </div>
                 )}
-                <Button variant="outline" onClick={exportCSV} disabled={!transactions?.length}><Download className="mr-2 h-4 w-4" />Export CSV</Button>
+                 <Button variant="outline" onClick={exportCSV} disabled={!activityRows.length}><Download className="mr-2 h-4 w-4" />Export CSV</Button>
               </div>
             </CardContent>
           </Card>
@@ -279,25 +310,25 @@ export default function Transactions() {
                 <Table>
                   <TableHeader className="table-sticky-header">
                     <TableRow>
-                      <TableHead>Date</TableHead><TableHead>Party</TableHead><TableHead>Wallet</TableHead><TableHead>Email</TableHead><TableHead>Type</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
+                       <TableHead>Date</TableHead><TableHead>Activity</TableHead><TableHead>Party / From</TableHead><TableHead>Wallet / To</TableHead><TableHead>Details</TableHead>
+                       <TableHead className="text-right">Amount (USD)</TableHead>
                       <TableHead className="text-right">Balance After (USD)</TableHead>
-                      <TableHead className="text-right">Rate</TableHead>
-                      <TableHead className="text-right">NPR Total</TableHead>
                       <TableHead>Remark</TableHead><TableHead className="w-[100px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {isLoading ? ([...Array(5)].map((_, i) => (<TableRow key={i}>{[...Array(11)].map((_, j) => (<TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>))}</TableRow>)))
-                    : transactions?.length === 0 ? (<TableRow><TableCell colSpan={11}><EmptyState title="No transactions yet" description="Create your first transaction using the Bulk Transaction button" className="my-8" /></TableCell></TableRow>)
-                    : transactions?.map((txn) => (
-                      <TableRow key={txn.id}>
-                        <TableCell className="whitespace-nowrap">{formatDate(txn.txn_date)}</TableCell>
-                        <TableCell className="font-medium">{txn.parties?.party_name}</TableCell>
-                        <TableCell>{txn.paypal_accounts?.paypal_name}{(txn.paypal_accounts as any)?.tag && <span className="ml-1.5 text-[10px] font-medium text-pink-600 dark:text-pink-400">{(txn.paypal_accounts as any).tag}</span>}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{txn.paypal_emails?.email || '-'}</TableCell>
-                        <TableCell><StatusBadge variant={txn.txn_type === 'INCOMING' ? 'incoming' : 'outgoing'}>{txn.txn_type === 'INCOMING' ? <><ArrowDownLeft className="mr-1 h-3 w-3" /> In</> : <><ArrowUpRight className="mr-1 h-3 w-3" /> Out</>}</StatusBadge></TableCell>
-                        <TableCell className="text-right font-mono">{formatUSD(txn.amount)}</TableCell>
+                     {isLoading || transfersLoading ? ([...Array(5)].map((_, i) => (<TableRow key={i}>{[...Array(9)].map((_, j) => (<TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>))}</TableRow>)))
+                     : activityRows.length === 0 ? (<TableRow><TableCell colSpan={9}><EmptyState title="No activity found" description="Try adjusting your filters" className="my-8" /></TableCell></TableRow>)
+                     : activityRows.map((row) => {
+                       if (row.kind === 'transaction') {
+                         const txn = row.transaction;
+                         return <TableRow key={`transaction-${txn.id}`}>
+                         <TableCell className="whitespace-nowrap">{formatDate(txn.txn_date)}</TableCell>
+                         <TableCell><StatusBadge variant={txn.txn_type === 'INCOMING' ? 'incoming' : 'outgoing'}>{txn.txn_type === 'INCOMING' ? <><ArrowDownLeft className="mr-1 h-3 w-3" /> Incoming</> : <><ArrowUpRight className="mr-1 h-3 w-3" /> Outgoing</>}</StatusBadge></TableCell>
+                         <TableCell className="font-medium">{txn.parties?.party_name}</TableCell>
+                         <TableCell>{txn.paypal_accounts?.paypal_name}{(txn.paypal_accounts as any)?.tag && <span className="ml-1.5 text-[10px] font-medium text-pink-600 dark:text-pink-400">{(txn.paypal_accounts as any).tag}</span>}<div className="text-xs text-muted-foreground">{txn.paypal_emails?.email || '-'}</div></TableCell>
+                         <TableCell className="text-xs text-muted-foreground">Rate: {showSensitive ? txn.rate.toFixed(2) : MASK}<br />NPR Total: {showSensitive ? formatNumber(txn.total) : MASK}</TableCell>
+                         <TableCell className="text-right font-mono">{showSensitive ? formatUSD(txn.amount) : MASK}</TableCell>
                         <TableCell className="text-right font-mono font-medium">
                           {!txn.paypal_account_id ? '—' : usdBalanceHistoryLoading ? <Skeleton className="ml-auto h-5 w-20" /> : usdBalanceHistoryError ? (
                             <span title="Could not load account balance">Unavailable</span>
@@ -305,8 +336,6 @@ export default function Transactions() {
                             transactionBalanceText(txn.id)
                           ) : '—'}
                         </TableCell>
-                        <TableCell className="text-right font-mono text-muted-foreground">{showSensitive ? txn.rate.toFixed(2) : MASK}</TableCell>
-                        <TableCell className="text-right font-mono text-muted-foreground">{showSensitive ? formatNumber(txn.total) : MASK}</TableCell>
                         <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">{txn.remark || '-'}</TableCell>
                         <TableCell>
                           <DropdownMenu>
@@ -327,122 +356,31 @@ export default function Transactions() {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
-                      </TableRow>
-                    ))}
+                       </TableRow>;
+                       }
+                       const transfer = row.transfer;
+                       const fee = transfer.total - transfer.amount;
+                       return <TableRow key={`transfer-${transfer.id}`}>
+                         <TableCell className="whitespace-nowrap">{formatDate(transfer.transfer_date)}</TableCell>
+                         <TableCell><StatusBadge variant="settled"><ArrowRightLeft className="mr-1 h-3 w-3" /> Transfer</StatusBadge></TableCell>
+                         <TableCell className="font-medium">{transfer.from_wallet?.paypal_name || 'None'}</TableCell>
+                         <TableCell className="font-medium">{transfer.to_wallet?.paypal_name || 'None'}</TableCell>
+                         <TableCell className="text-xs text-muted-foreground">Fee: {showSensitive ? formatUSD(fee) : MASK}<br />Total Deducted: {showSensitive ? formatUSD(transfer.total) : MASK}</TableCell>
+                         <TableCell className="text-right font-mono">{showSensitive ? formatUSD(transfer.amount) : MASK}</TableCell>
+                         <TableCell className="text-right font-mono text-xs">
+                           <div>From: {!transfer.from_wallet_id ? '—' : usdBalanceHistoryLoading ? <Skeleton className="ml-auto h-4 w-20" /> : usdBalanceHistoryError ? 'Unavailable' : transferBalanceText(transfer.id, 'from')}</div>
+                           <div>To: {!transfer.to_wallet_id ? '—' : usdBalanceHistoryLoading ? <Skeleton className="ml-auto h-4 w-20" /> : usdBalanceHistoryError ? 'Unavailable' : transferBalanceText(transfer.id, 'to')}</div>
+                         </TableCell>
+                         <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">{transfer.remark || '-'}</TableCell>
+                         <TableCell><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="bg-popover"><DropdownMenuItem onClick={() => { if (!isAdmin) { notifyAdmin(); return; } setDeleteTransferId(transfer.id); }} className="text-destructive focus:text-destructive"><Trash2 className="h-4 w-4 mr-2" />Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
+                       </TableRow>;
+                     })}
                   </TableBody>
                 </Table>
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="transfers" className="mt-6">
-          {/* Transfers Table */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="table-container max-h-[600px]">
-                <Table>
-                  <TableHeader className="table-sticky-header">
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>From Wallet</TableHead>
-                      <TableHead>To Wallet</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead className="text-right">Fee</TableHead>
-                      <TableHead className="text-right">Total Deducted</TableHead>
-                      <TableHead className="text-right">Balance After (USD)</TableHead>
-                      <TableHead>Remark</TableHead>
-                      <TableHead className="w-[80px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {transfersLoading ? (
-                      [...Array(3)].map((_, i) => (
-                        <TableRow key={i}>
-                          {[...Array(9)].map((_, j) => (
-                            <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
-                          ))}
-                        </TableRow>
-                      ))
-                    ) : transfers?.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={9}>
-                          <EmptyState 
-                            icon={<ArrowRightLeft className="h-6 w-6" />}
-                            title="No transfers yet"
-                            description="Create your first transfer to move funds between wallets"
-                            action={
-                              <Button onClick={() => setShowTransferModal(true)}>
-                                <Plus className="mr-2 h-4 w-4" />
-                                New Transfer
-                              </Button>
-                            }
-                            className="my-8"
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      transfers?.map((transfer) => {
-                        const fee = transfer.total - transfer.amount;
-                        return (
-                          <TableRow key={transfer.id}>
-                            <TableCell className="whitespace-nowrap">{formatDate(transfer.transfer_date)}</TableCell>
-                            <TableCell className="font-medium">{transfer.from_wallet?.paypal_name || 'None'}</TableCell>
-                            <TableCell className="font-medium">{transfer.to_wallet?.paypal_name || 'None'}</TableCell>
-                            <TableCell className="text-right font-mono">
-                              {formatUSD(transfer.amount)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-muted-foreground">
-                              {fee > 0 ? formatUSD(fee) : '-'}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-destructive">
-                              -{formatUSD(transfer.total)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-xs">
-                              <div className="flex flex-col items-end gap-1">
-                                <div className="flex items-center gap-1">
-                                  <span>From:</span>
-                                  {!transfer.from_wallet_id ? '—' : usdBalanceHistoryLoading
-                                    ? <Skeleton className="h-4 w-20" />
-                                    : usdBalanceHistoryError ? 'Unavailable' : transferBalanceText(transfer.id, 'from')}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <span>To:</span>
-                                  {!transfer.to_wallet_id ? '—' : usdBalanceHistoryLoading
-                                    ? <Skeleton className="h-4 w-20" />
-                                    : usdBalanceHistoryError ? 'Unavailable' : transferBalanceText(transfer.id, 'to')}
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-muted-foreground max-w-[150px] truncate">
-                              {transfer.remark || '-'}
-                            </TableCell>
-                            <TableCell>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="bg-popover">
-                                  <DropdownMenuItem onClick={() => { if (!isAdmin) { notifyAdmin(); return; } setDeleteTransferId(transfer.id); }} className="text-destructive focus:text-destructive">
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+         </div>
 
       <BulkTransactionModal open={showBulkModal} onOpenChange={setShowBulkModal} />
       <TransferModal open={showTransferModal} onOpenChange={setShowTransferModal} />
