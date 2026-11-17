@@ -27,8 +27,9 @@ interface TransferFilters {
 }
 
 export function useWalletTransfers(filters: TransferFilters = {}) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['wallet-transfers', filters],
+    queryKey: ['wallet-transfers', user?.id, filters],
     queryFn: async () => {
       let query = supabase
         .from('wallet_transfers')

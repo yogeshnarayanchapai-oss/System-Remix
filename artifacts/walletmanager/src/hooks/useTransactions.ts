@@ -16,8 +16,9 @@ interface TransactionFilters {
 }
 
 export function useTransactions(filters: TransactionFilters = {}) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['transactions', filters],
+    queryKey: ['transactions', user?.id, filters],
     queryFn: async () => {
       let query = supabase
         .from('transactions')

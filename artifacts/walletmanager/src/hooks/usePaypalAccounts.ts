@@ -6,8 +6,9 @@ import { useAuth } from './useAuth';
 import { USD_ACCOUNT_BALANCE_HISTORY_QUERY_KEY } from './useAccountBalanceHistory';
 
 export function usePaypalAccounts() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['paypal-accounts'],
+    queryKey: ['paypal-accounts', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('paypal_accounts')
@@ -21,8 +22,9 @@ export function usePaypalAccounts() {
 }
 
 export function useActivePaypalAccounts() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['paypal-accounts', 'active'],
+    queryKey: ['paypal-accounts', user?.id, 'active'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('paypal_accounts')
@@ -37,8 +39,9 @@ export function useActivePaypalAccounts() {
 }
 
 export function usePaypalAccount(id: string) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['paypal-accounts', id],
+    queryKey: ['paypal-accounts', user?.id, id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('paypal_accounts')

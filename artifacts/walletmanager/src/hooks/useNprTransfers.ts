@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './useAuth';
 import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, subMonths, parseISO } from 'date-fns';
 
 export interface NprTransfer {
@@ -51,10 +52,11 @@ function getDateRange(preset: DatePreset, customFrom?: string, customTo?: string
 }
 
 export function useNprTransfers(params: UseNprTransfersParams) {
+  const { user } = useAuth();
   const { datePreset, customDateFrom, customDateTo, nepaliAccountId, remarkSearch } = params;
 
   return useQuery({
-    queryKey: ['npr-transfers', 'with-source-id', datePreset, customDateFrom, customDateTo, nepaliAccountId, remarkSearch],
+    queryKey: ['npr-transfers', user?.id, 'with-source-id', datePreset, customDateFrom, customDateTo, nepaliAccountId, remarkSearch],
     queryFn: async () => {
       const { from, to } = getDateRange(datePreset, customDateFrom, customDateTo);
       const fromStr = from.toISOString().split('T')[0];

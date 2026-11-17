@@ -78,10 +78,11 @@ export default function WalletAccounts() {
   const [deleteEmailId, setDeleteEmailId] = useState<string | null>(null);
 
   // Data hooks
+  const { user } = useAuth();
   const { data: accounts, isLoading } = usePaypalAccounts();
   const { data: summaryData } = usePaypalSummary();
   const { data: viewBalances } = useQuery({
-    queryKey: ['paypal-accounts-view-balances'],
+    queryKey: ['paypal-accounts-view-balances', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('paypal_accounts_with_balance')
@@ -98,7 +99,6 @@ export default function WalletAccounts() {
   const updateAccount = useUpdatePaypalAccount();
   const deleteAccount = useDeletePaypalAccount();
 
-  const { user } = useAuth();
   const { role } = useUserRole();
   const isAdmin = user && role === "ADMIN";
 

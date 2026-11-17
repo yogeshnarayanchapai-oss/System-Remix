@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './useAuth';
 
 const PAGE_SIZE = 1000;
 
@@ -57,8 +58,9 @@ export interface UsdAccountLedgerSummary {
 }
 
 export function useUsdAccountBalanceHistory(enabled = true) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: USD_ACCOUNT_BALANCE_HISTORY_QUERY_KEY,
+    queryKey: [...USD_ACCOUNT_BALANCE_HISTORY_QUERY_KEY, user?.id],
     enabled,
     staleTime: 30_000,
     queryFn: async () => {
@@ -221,8 +223,9 @@ export interface NprAccountLedgerSummary {
 }
 
 export function useNprAccountBalanceHistory(enabled = true) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: NPR_ACCOUNT_BALANCE_HISTORY_QUERY_KEY,
+    queryKey: [...NPR_ACCOUNT_BALANCE_HISTORY_QUERY_KEY, user?.id],
     enabled,
     staleTime: 30_000,
     queryFn: async () => {

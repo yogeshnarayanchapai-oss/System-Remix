@@ -22,6 +22,7 @@ import { useNepaliAccounts } from '@/hooks/useNepaliAccounts';
 import { useNprAccountBalanceHistory } from '@/hooks/useAccountBalanceHistory';
 import { useNprTransfers, DatePreset, NprTransfer } from '@/hooks/useNprTransfers';
 import { useDeleteNprTransfer, useUpdateNprTransfer } from '@/hooks/useNepaliAccounts';
+import { useUserRole } from '@/hooks/useUserRole';
 import { formatNPR } from '@/lib/format';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { NepaliAccountSelect } from '@/components/nepali-accounts/NepaliAccountSelect';
@@ -103,6 +104,18 @@ export function TransactionsTab({ onViewParty, initialDateFrom, initialDateTo }:
     nepaliAccountId: selectedNprAccountId,
     remarkSearch: remarkSearch.trim() || undefined,
   });
+  const { isAdmin } = useUserRole();
+  const visibleTransfers = useMemo(() => {
+    const assignedAccountIds = new Set((nepaliAccounts || []).map((account) => account.id));
+    return isAdmin
+      ? transfers || []
+      : (transfers || []).filter((transfer) =>
+        !!transfer.from_account_id
+        && !!transfer.to_account_id
+        && assignedAccountIds.has(transfer.from_account_id)
+        && assignedAccountIds.has(transfer.to_account_id)
+      );
+  }, [transfers, nepaliAccounts, isAdmin]);
   const {
     data: nprBalanceHistory,
     isLoading: nprBalanceHistoryLoading,
@@ -219,7 +232,7 @@ export function TransactionsTab({ onViewParty, initialDateFrom, initialDateTo }:
       .map((item) => ({ kind: 'transaction', item }));
     const transferRows: ActivityRow[] = activityType === 'RECEIVABLE' || activityType === 'PAYABLE' || selectedPartyId
       ? []
-      : (transfers || []).map((item) => ({ kind: 'transfer', item }));
+      : visibleTransfers.map((item) => ({ kind: 'transfer', item }));
     return [...transactionRows, ...transferRows].sort((a, b) => {
       const dateOf = (row: ActivityRow) => row.kind === 'transfer' ? row.item.transfer_date : row.item.entry_date;
       const keyOf = (row: ActivityRow) => row.kind === 'transfer' ? row.item.source_id : row.item.id;
@@ -227,7 +240,7 @@ export function TransactionsTab({ onViewParty, initialDateFrom, initialDateTo }:
         || b.item.created_at.localeCompare(a.item.created_at)
         || keyOf(b).localeCompare(keyOf(a));
     });
-  }, [transactionsData?.transactions, transfers, activityType, selectedPartyId]);
+  }, [transactionsData?.transactions, visibleTransfers, activityType, selectedPartyId]);
   const totalActivityPages = Math.max(1, Math.ceil(activityRows.length / 50));
   const visibleActivityRows = activityRows.slice((currentPage - 1) * 50, currentPage * 50);
 
@@ -250,7 +263,7 @@ export function TransactionsTab({ onViewParty, initialDateFrom, initialDateTo }:
             id: txn.id,
             values: [txn.entry_date, txn.party_name, getEntryTypeLabel(txn.entry_type), txn.amount_npr, txn.nepali_account_name || 'None', txn.remark || ''],
           })),
-        ...(activityType === 'RECEIVABLE' || activityType === 'PAYABLE' || selectedPartyId ? [] : (transfers || []).map((transfer) => ({
+        ...(activityType === 'RECEIVABLE' || activityType === 'PAYABLE' || selectedPartyId ? [] : visibleTransfers.map((transfer) => ({
           date: transfer.transfer_date,
           createdAt: transfer.created_at,
           id: transfer.source_id,
@@ -510,7 +523,7 @@ export function TransactionsTab({ onViewParty, initialDateFrom, initialDateTo }:
                   </TableRow>;
                 })() : (() => {
                   const transfer = row.item;
-                  return <TableRow key={`transfer-${transfer.source_id}`}><TableCell className="whitespace-nowrap">{format(new Date(transfer.transfer_date), 'MMM d, yyyy')}</TableCell><TableCell className="font-medium">{transfer.from_account_name} → {transfer.to_account_name}</TableCell><TableCell><StatusBadge variant="settled"><ArrowRightLeft className="mr-1 h-3 w-3" />Transfer</StatusBadge></TableCell><TableCell className="text-right font-mono">{formatNPR(transfer.amount_npr)}</TableCell><TableCell>From: {transfer.from_account_name}<br />To: {transfer.to_account_name}</TableCell><TableCell className="text-right font-mono text-xs">{nprBalanceHistoryLoading ? <Skeleton className="ml-auto h-5 w-24" /> : nprBalanceHistoryError ? 'Unavailable' : <><div>From: {transfer.from_account_id ? nprBalanceHistory?.transferBalanceAfter[transfer.source_id]?.from != null ? formatNPR(nprBalanceHistory.transferBalanceAfter[transfer.source_id].from!) : '—' : '—'}</div><div>To: {transfer.to_account_id ? nprBalanceHistory?.transferBalanceAfter[transfer.source_id]?.to != null ? formatNPR(nprBalanceHistory.transferBalanceAfter[transfer.source_id].to!) : '—' : '—'}</div></>}</TableCell><TableCell className="max-w-[200px] truncate">{transfer.remark || '-'}</TableCell><TableCell><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="bg-popover"><DropdownMenuItem onClick={() => openTransferEdit(transfer)}><Pencil className="h-4 w-4 mr-2" />Edit</DropdownMenuItem><DropdownMenuItem onClick={() => setDeleteTransfer(transfer)} className="text-destructive focus:text-destructive"><Trash2 className="h-4 w-4 mr-2" />Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell></TableRow>;
+                  return <TableRow key={`transfer-${transfer.source_id}`}><TableCell className="whitespace-nowrap">{format(new Date(transfer.transfer_date), 'MMM d, yyyy')}</TableCell><TableCell className="font-medium">{transfer.from_account_name} → {transfer.to_account_name}</TableCell><TableCell><StatusBadge variant="settled"><ArrowRightLeft className="mr-1 h-3 w-3" />Transfer</StatusBadge></TableCell><TableCell className="text-right font-mono">{formatNPR(transfer.amount_npr)}</TableCell><TableCell>From: {transfer.from_account_name}<br />To: {transfer.to_account_name}</TableCell><TableCell className="text-right font-mono text-xs">{nprBalanceHistoryLoading ? <Skeleton className="ml-auto h-5 w-24" /> : nprBalanceHistoryError ? 'Unavailable' : <><div>From: {transfer.from_account_id ? nprBalanceHistory?.transferBalanceAfter[transfer.source_id]?.from != null ? formatNPR(nprBalanceHistory.transferBalanceAfter[transfer.source_id].from!) : '—' : '—'}</div><div>To: {transfer.to_account_id ? nprBalanceHistory?.transferBalanceAfter[transfer.source_id]?.to != null ? formatNPR(nprBalanceHistory.transferBalanceAfter[transfer.source_id].to!) : '—' : '—'}</div></>}</TableCell><TableCell className="max-w-[200px] truncate">{transfer.remark || '-'}</TableCell><TableCell>{isAdmin && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="bg-popover"><DropdownMenuItem onClick={() => openTransferEdit(transfer)}><Pencil className="h-4 w-4 mr-2" />Edit</DropdownMenuItem><DropdownMenuItem onClick={() => setDeleteTransfer(transfer)} className="text-destructive focus:text-destructive"><Trash2 className="h-4 w-4 mr-2" />Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu>}</TableCell></TableRow>;
                 })())
               )}
             </TableBody>

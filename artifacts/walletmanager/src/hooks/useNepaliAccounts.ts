@@ -37,8 +37,9 @@ export interface NepaliAccountLedgerEntry {
 
 // Fetch all Nepali accounts
 export function useNepaliAccounts(activeOnly = false) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['nepali-accounts', activeOnly],
+    queryKey: ['nepali-accounts', user?.id, activeOnly],
     queryFn: async () => {
       let query = supabase
         .from('nepali_accounts')
@@ -58,8 +59,9 @@ export function useNepaliAccounts(activeOnly = false) {
 
 // Fetch Nepali accounts with calculated balances
 export function useNepaliAccountsWithBalances() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['nepali-accounts-with-balances'],
+    queryKey: ['nepali-accounts-with-balances', user?.id],
     queryFn: async () => {
       // Read from aggregated DB view (future-proof, avoids client-side double counting)
       const { data, error } = await supabase
@@ -278,44 +280,14 @@ export function useCreateNprTransfer() {
       transfer_date: string;
       remark?: string;
     }) => {
-      const sourceId = crypto.randomUUID();
       const remark = data.remark?.trim() || null;
-
-      const entries: any[] = [];
-
-      // Only create TRANSFER_OUT if from_account_id is set
-      if (data.from_account_id) {
-        entries.push({
-          nepali_account_id: data.from_account_id,
-          entry_date: data.transfer_date,
-          entry_type: 'TRANSFER_OUT',
-          amount_npr: data.amount_npr,
-          source_type: 'TRANSFER',
-          source_id: sourceId,
-          remark,
-        });
-      }
-
-      // Only create TRANSFER_IN if to_account_id is set
-      if (data.to_account_id) {
-        entries.push({
-          nepali_account_id: data.to_account_id,
-          entry_date: data.transfer_date,
-          entry_type: 'TRANSFER_IN',
-          amount_npr: data.amount_npr,
-          source_type: 'TRANSFER',
-          source_id: sourceId,
-          remark,
-        });
-      }
-
-      if (entries.length === 0) throw new Error('At least one account must be selected');
-
-      // Atomic insert
-      const { error } = await supabase
-        .from('nepali_account_ledger')
-        .insert(entries);
-
+      const { data: sourceId, error } = await (supabase as any).rpc('walletmanager_create_npr_transfer', {
+        _from_account_id: data.from_account_id,
+        _to_account_id: data.to_account_id,
+        _amount_npr: data.amount_npr,
+        _transfer_date: data.transfer_date,
+        _remark: remark,
+      });
       if (error) throw error;
 
       // Log activity
@@ -335,7 +307,7 @@ export function useCreateNprTransfer() {
         }]);
       }
 
-      return { success: true, sourceId };
+      return { success: true, sourceId: sourceId as string };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nepali-accounts-with-balances'] });

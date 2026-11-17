@@ -12,6 +12,8 @@ import { NepaliAccountSelect } from '@/components/nepali-accounts/NepaliAccountS
 import { useActivePaypalAccounts } from '@/hooks/usePaypalAccounts';
 import { useCreateWalletTransfer } from '@/hooks/useWalletTransfers';
 import { useCreateNprTransfer, useNepaliAccounts } from '@/hooks/useNepaliAccounts';
+import { useUserRole } from '@/hooks/useUserRole';
+import { useAuth } from '@/hooks/useAuth';
 import { formatUSD, formatNPR } from '@/lib/format';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -43,10 +45,12 @@ export function TransferModal({ open, onOpenChange }: Props) {
   const createUsdTransfer = useCreateWalletTransfer();
   const createNprTransfer = useCreateNprTransfer();
   const { data: nepaliAccounts } = useNepaliAccounts(true);
+  const { isAdmin } = useUserRole();
+  const { user } = useAuth();
 
   // Live wallet balances from authoritative view
   const { data: walletBalances } = useQuery({
-    queryKey: ['paypal-accounts-view-balances'],
+    queryKey: ['paypal-accounts-view-balances', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('paypal_accounts_with_balance')
@@ -59,7 +63,7 @@ export function TransferModal({ open, onOpenChange }: Props) {
 
   // Live NPR balances from authoritative view
   const { data: nprBalances } = useQuery({
-    queryKey: ['nepali-accounts-view-balances'],
+    queryKey: ['nepali-accounts-view-balances', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('nepali_accounts_with_balance')
@@ -102,10 +106,10 @@ export function TransferModal({ open, onOpenChange }: Props) {
   }, [open]);
 
   const walletOptionsWithNone: SelectOption[] = useMemo(() => {
-    const opts: SelectOption[] = [{ value: '__none__', label: 'None' }];
+    const opts: SelectOption[] = isAdmin ? [{ value: '__none__', label: 'None' }] : [];
     wallets?.forEach(w => opts.push({ value: w.id, label: w.paypal_name, tag: (w as any).tag || undefined }));
     return opts;
-  }, [wallets]);
+  }, [wallets, isAdmin]);
 
   const toWalletOptionsWithNone = useMemo(() => {
     return walletOptionsWithNone.filter(w => w.value === '__none__' || w.value !== fromWalletId);
@@ -118,7 +122,10 @@ export function TransferModal({ open, onOpenChange }: Props) {
   const toReceived = usdAmountNum;
   const actualFromId = fromWalletId === '__none__' ? null : fromWalletId;
   const actualToId = toWalletId === '__none__' ? null : toWalletId;
-  const isUsdValid = (actualFromId || actualToId) && !(actualFromId && actualToId && actualFromId === actualToId) && usdAmountNum > 0 && feeNum >= 0;
+  const isUsdValid = (isAdmin
+    ? (actualFromId || actualToId) !== null && !(actualFromId && actualToId && actualFromId === actualToId)
+    : !!actualFromId && !!actualToId && actualFromId !== actualToId)
+    && usdAmountNum > 0 && feeNum >= 0;
 
   // NPR: convert null to/from for None support
   const actualNprFromId = fromAccountId;
@@ -126,7 +133,10 @@ export function TransferModal({ open, onOpenChange }: Props) {
 
   // NPR validation
   const nprAmountNum = parseFloat(nprAmount) || 0;
-  const isNprValid = (fromAccountId || toAccountId) && !(fromAccountId && toAccountId && fromAccountId === toAccountId) && nprAmountNum > 0;
+  const isNprValid = (isAdmin
+    ? !!(fromAccountId || toAccountId) && !(fromAccountId && toAccountId && fromAccountId === toAccountId)
+    : !!fromAccountId && !!toAccountId && fromAccountId !== toAccountId)
+    && nprAmountNum > 0;
 
   const handleUsdSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -322,6 +332,7 @@ export function TransferModal({ open, onOpenChange }: Props) {
                   value={fromAccountId}
                   onChange={setFromAccountId}
                   placeholder="Select source account"
+                  allowNone={isAdmin}
                 />
               </div>
 
@@ -335,6 +346,7 @@ export function TransferModal({ open, onOpenChange }: Props) {
                   value={toAccountId}
                   onChange={setToAccountId}
                   placeholder="Select destination account"
+                  allowNone={isAdmin}
                 />
                 {fromAccountId && toAccountId === fromAccountId && (
                   <p className="text-xs text-destructive mt-1">Source and destination must be different</p>

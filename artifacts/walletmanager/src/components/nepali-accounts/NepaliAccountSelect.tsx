@@ -11,13 +11,15 @@ interface NepaliAccountSelectProps {
   onChange: (value: string | null) => void;
   placeholder?: string;
   disabled?: boolean;
+  allowNone?: boolean;
 }
 
 export function NepaliAccountSelect({ 
   value, 
   onChange, 
   placeholder = "Select Nepali Account",
-  disabled = false 
+  disabled = false,
+  allowNone = true,
 }: NepaliAccountSelectProps) {
   const [open, setOpen] = useState(false);
   const { data: accounts, isLoading } = useNepaliAccounts(true); // Only active accounts
@@ -46,7 +48,7 @@ export function NepaliAccountSelect({
           className="w-full justify-between"
           disabled={disabled || isLoading}
         >
-          {selectedAccount ? selectedAccount.name : "None"}
+          {selectedAccount ? selectedAccount.name : allowNone ? "None" : placeholder}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -56,18 +58,12 @@ export function NepaliAccountSelect({
           <CommandList>
             <CommandEmpty>No account found.</CommandEmpty>
             <CommandGroup>
-              <CommandItem
-                value="none"
-                onSelect={() => handleSelect('none')}
-              >
-                <Check
-                  className={cn(
-                    "mr-2 h-4 w-4",
-                    value === null ? "opacity-100" : "opacity-0"
-                  )}
-                />
-                None
-              </CommandItem>
+              {allowNone && (
+                <CommandItem value="none" onSelect={() => handleSelect('none')}>
+                  <Check className={cn("mr-2 h-4 w-4", value === null ? "opacity-100" : "opacity-0")} />
+                  None
+                </CommandItem>
+              )}
               {accounts?.map((account) => (
                 <CommandItem
                   key={account.id}

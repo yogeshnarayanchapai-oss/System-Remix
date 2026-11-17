@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './useAuth';
 
 export interface TransactionFilters {
   dateFrom?: string;
@@ -26,10 +27,11 @@ export interface PartyTransactionWithDetails {
 }
 
 export function useAllPartyTransactions(filters: TransactionFilters) {
+  const { user } = useAuth();
   const { dateFrom, dateTo, partyId, nepaliAccountId, remarkSearch, page = 1, pageSize = 50 } = filters;
   
   return useQuery({
-    queryKey: ['all-party-transactions', filters],
+    queryKey: ['all-party-transactions', user?.id, filters],
     queryFn: async () => {
       // Retrieve every filtered transaction before the consumer merges transfers
       // and paginates the globally sorted activity list.

@@ -12,10 +12,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { Users, Shield, Edit3, Plus, Key, UserX, UserCheck } from 'lucide-react';
 import { format } from 'date-fns';
+import { usePaypalAccounts } from '@/hooks/usePaypalAccounts';
+import { useNepaliAccounts } from '@/hooks/useNepaliAccounts';
 
 type AppRole = 'ADMIN' | 'EDITOR';
 
@@ -25,12 +28,17 @@ interface UserWithRole {
   role: AppRole;
   created_at: string;
   is_active: boolean;
+  paypalAccountIds: string[];
+  nepaliAccountIds: string[];
 }
 
 interface UserManagementProps { embedded?: boolean }
 export default function UserManagement({ embedded = false }: UserManagementProps = {}) {
   const queryClient = useQueryClient();
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [accessUser, setAccessUser] = useState<UserWithRole | null>(null);
+  const [selectedPaypalIds, setSelectedPaypalIds] = useState<string[]>([]);
+  const [selectedNepaliIds, setSelectedNepaliIds] = useState<string[]>([]);
   const [showAddUser, setShowAddUser] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState<string | null>(null);
   
@@ -41,9 +49,11 @@ export default function UserManagement({ embedded = false }: UserManagementProps
   
   // Change password form state
   const [changePasswordValue, setChangePasswordValue] = useState('');
+  const { data: paypalAccounts } = usePaypalAccounts();
+  const { data: nepaliAccounts } = useNepaliAccounts(false);
 
   // Fetch all users with their roles from edge function
-  const { data: users, isLoading } = useQuery({
+  const { data: users, isLoading, isError, error } = useQuery({
     queryKey: ['users-with-roles'],
     queryFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -74,16 +84,23 @@ export default function UserManagement({ embedded = false }: UserManagementProps
         .select('*');
       
       if (rolesError) throw rolesError;
+      const { data: accessRows, error: accessError } = await (supabase as any)
+        .from('user_account_access')
+        .select('user_id, paypal_account_id, nepali_account_id');
+      if (accessError) throw accessError;
 
       // Combine the data
       const usersWithRoles: UserWithRole[] = authUsers.map((user: any) => {
         const roleEntry = roles?.find(r => r.user_id === user.id);
+        const userAccess = (accessRows || []).filter((row: any) => row.user_id === user.id);
         return {
           user_id: user.id,
           email: user.email,
           role: (roleEntry?.role || 'EDITOR') as AppRole,
           created_at: user.created_at,
           is_active: !user.banned_until || new Date(user.banned_until) < new Date(),
+          paypalAccountIds: userAccess.flatMap((row: any) => row.paypal_account_id ? [row.paypal_account_id] : []),
+          nepaliAccountIds: userAccess.flatMap((row: any) => row.nepali_account_id ? [row.nepali_account_id] : []),
         };
       });
 
@@ -111,6 +128,34 @@ export default function UserManagement({ embedded = false }: UserManagementProps
       toast.error('Failed to update role: ' + error.message);
     },
   });
+
+  const updateAccountAccessMutation = useMutation({
+    mutationFn: async () => {
+      if (!accessUser) throw new Error('Select a user first');
+      const { error } = await (supabase as any).rpc('walletmanager_replace_user_account_access', {
+        _target_user_id: accessUser.user_id,
+        _paypal_account_ids: selectedPaypalIds,
+        _nepali_account_ids: selectedNepaliIds,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-with-roles'] });
+      queryClient.invalidateQueries({ queryKey: ['paypal-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['nepali-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['paypal-accounts-with-balances'] });
+      queryClient.invalidateQueries({ queryKey: ['nepali-accounts-with-balances'] });
+      toast.success('Wallet access updated');
+      setAccessUser(null);
+    },
+    onError: (error: Error) => toast.error(`Could not update wallet access: ${error.message}`),
+  });
+
+  const openAccountAccess = (user: UserWithRole) => {
+    setAccessUser(user);
+    setSelectedPaypalIds(user.paypalAccountIds);
+    setSelectedNepaliIds(user.nepaliAccountIds);
+  };
 
   // Create user mutation
   const createUserMutation = useMutation({
@@ -347,7 +392,12 @@ export default function UserManagement({ embedded = false }: UserManagementProps
             </Dialog>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {isError ? (
+              <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+                Wallet access data could not be loaded. Apply the Wallet Manager account-access SQL migration in Supabase, then reload this page.
+                {error instanceof Error && <div className="mt-1 text-xs">{error.message}</div>}
+              </div>
+            ) : isLoading ? (
               <div className="space-y-3">
                 {[1, 2, 3].map(i => (
                   <Skeleton key={i} className="h-12 w-full" />
@@ -359,6 +409,7 @@ export default function UserManagement({ embedded = false }: UserManagementProps
                   <TableRow>
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
+                    <TableHead>Wallet Access</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead>Actions</TableHead>
@@ -390,6 +441,15 @@ export default function UserManagement({ embedded = false }: UserManagementProps
                           >
                             {user.role}
                           </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {user.role === 'ADMIN' ? (
+                          <Badge>All wallets</Badge>
+                        ) : (
+                          <Button size="sm" variant="outline" onClick={() => openAccountAccess(user)}>
+                            {user.paypalAccountIds.length + user.nepaliAccountIds.length} assigned
+                          </Button>
                         )}
                       </TableCell>
                       <TableCell>
@@ -457,7 +517,7 @@ export default function UserManagement({ embedded = false }: UserManagementProps
                   ))}
                   {(!users || users.length === 0) && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center text-muted-foreground">
                         No users found
                       </TableCell>
                     </TableRow>
@@ -467,6 +527,51 @@ export default function UserManagement({ embedded = false }: UserManagementProps
             )}
           </CardContent>
         </Card>
+        <Dialog open={!!accessUser} onOpenChange={(open) => !open && setAccessUser(null)}>
+          <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Wallet access — {accessUser?.email}</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-6 sm:grid-cols-2">
+              <section className="space-y-3">
+                <h3 className="font-medium">USD wallets</h3>
+                {!paypalAccounts?.length && <p className="text-sm text-muted-foreground">No active USD wallets.</p>}
+                {paypalAccounts?.map((account) => (
+                  <label key={account.id} className="flex cursor-pointer items-center gap-3 rounded-md border p-3">
+                    <Checkbox
+                      checked={selectedPaypalIds.includes(account.id)}
+                      onCheckedChange={(checked) => setSelectedPaypalIds((ids) =>
+                        checked ? [...new Set([...ids, account.id])] : ids.filter((id) => id !== account.id)
+                      )}
+                    />
+                    <span>{account.paypal_name}</span>
+                  </label>
+                ))}
+              </section>
+              <section className="space-y-3">
+                <h3 className="font-medium">NPR wallets</h3>
+                {!nepaliAccounts?.length && <p className="text-sm text-muted-foreground">No active NPR wallets.</p>}
+                {nepaliAccounts?.map((account) => (
+                  <label key={account.id} className="flex cursor-pointer items-center gap-3 rounded-md border p-3">
+                    <Checkbox
+                      checked={selectedNepaliIds.includes(account.id)}
+                      onCheckedChange={(checked) => setSelectedNepaliIds((ids) =>
+                        checked ? [...new Set([...ids, account.id])] : ids.filter((id) => id !== account.id)
+                      )}
+                    />
+                    <span>{account.name}</span>
+                  </label>
+                ))}
+              </section>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAccessUser(null)}>Cancel</Button>
+              <Button onClick={() => updateAccountAccessMutation.mutate()} disabled={updateAccountAccessMutation.isPending}>
+                {updateAccountAccessMutation.isPending ? 'Saving...' : 'Save access'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
   );
 

@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { format, subDays } from 'date-fns';
 import { 
@@ -40,7 +39,7 @@ import { cn } from '@/lib/utils';
 import { useTransactions, useDeleteTransaction, useUpdateTransaction } from '@/hooks/useTransactions';
 import { useWalletTransfers, useDeleteWalletTransfer } from '@/hooks/useWalletTransfers';
 import { useUsdAccountBalanceHistory } from '@/hooks/useAccountBalanceHistory';
-import { useActivePaypalAccounts } from '@/hooks/usePaypalAccounts';
+import { useActivePaypalAccounts, usePaypalAccounts } from '@/hooks/usePaypalAccounts';
 import { useParties } from '@/hooks/useParties';
 import { useSensitiveDataVisibility } from '@/hooks/useSensitiveDataVisibility';
 import { formatDate, formatUSD, formatNumber } from '@/lib/format';
@@ -104,8 +103,12 @@ export default function Transactions() {
     isError: usdBalanceHistoryError,
   } = useUsdAccountBalanceHistory();
   const { data: walletAccounts } = useActivePaypalAccounts();
+  const { data: accessibleWallets } = usePaypalAccounts();
   const { data: parties } = useParties();
   const { isVisible: showSensitive, MASK } = useSensitiveDataVisibility();
+  const { role } = useUserRole();
+  const isAdmin = role === 'ADMIN';
+  const accessibleWalletIds = useMemo(() => new Set((accessibleWallets || []).map((wallet) => wallet.id)), [accessibleWallets]);
 
   type ActivityRow =
     | { kind: 'transaction'; activityDate: string; createdAt: string; id: string; transaction: Transaction }
@@ -133,6 +136,12 @@ export default function Transactions() {
         transaction,
       }));
     const transferRows: ActivityRow[] = (transfers || [])
+      .filter((transfer) => isAdmin || (
+        !!transfer.from_wallet_id
+        && !!transfer.to_wallet_id
+        && accessibleWalletIds.has(transfer.from_wallet_id)
+        && accessibleWalletIds.has(transfer.to_wallet_id)
+      ))
       .filter(() => partyFilter === 'ALL')
       .filter(() => activityType === 'ALL' || activityType === 'TRANSFER')
       .filter((transfer) => !normalizedSearch || [
@@ -155,7 +164,7 @@ export default function Transactions() {
       || b.createdAt.localeCompare(a.createdAt)
       || b.id.localeCompare(a.id)
     );
-  }, [transactions, transfers, activityType, search, partyFilter]);
+  }, [transactions, transfers, activityType, search, partyFilter, isAdmin, accessibleWalletIds]);
 
   const transactionBalanceText = (transactionId: string) => {
     const balance = usdBalanceHistory?.transactionBalanceAfter[transactionId];
@@ -171,10 +180,6 @@ export default function Transactions() {
   const updateTransaction = useUpdateTransaction();
   const deleteTransaction = useDeleteTransaction();
   const deleteTransfer = useDeleteWalletTransfer();
-
-  const { user } = useAuth();
-  const { role } = useUserRole();
-  const isAdmin = user && role === "ADMIN";
 
   const notifyAdmin = () => toast.error("Contact Admin to perform this action");
 
