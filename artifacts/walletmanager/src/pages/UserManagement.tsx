@@ -53,9 +53,9 @@ export default function UserManagement({ embedded = false }: UserManagementProps
   const { data: nepaliAccounts } = useNepaliAccounts(false);
 
   // Fetch all users with their roles from edge function
-  const { data: users, isLoading, isError, error } = useQuery({
+  const { data: userManagementData, isLoading, isError, error } = useQuery({
     queryKey: ['users-with-roles'],
-    queryFn: async () => {
+    queryFn: async (): Promise<{ users: UserWithRole[]; walletAccessReady: boolean; walletAccessError: string | null }> => {
       const { data: { session } } = await supabase.auth.getSession();
       
       // Get auth users from edge function
@@ -87,7 +87,6 @@ export default function UserManagement({ embedded = false }: UserManagementProps
       const { data: accessRows, error: accessError } = await (supabase as any)
         .from('user_account_access')
         .select('user_id, paypal_account_id, nepali_account_id');
-      if (accessError) throw accessError;
 
       // Combine the data
       const usersWithRoles: UserWithRole[] = authUsers.map((user: any) => {
@@ -104,9 +103,15 @@ export default function UserManagement({ embedded = false }: UserManagementProps
         };
       });
 
-      return usersWithRoles;
+      return {
+        users: usersWithRoles,
+        walletAccessReady: !accessError,
+        walletAccessError: accessError?.message || null,
+      };
     },
   });
+  const users = userManagementData?.users;
+  const walletAccessReady = userManagementData?.walletAccessReady ?? false;
 
   // Update user role mutation
   const updateRoleMutation = useMutation({
@@ -394,10 +399,18 @@ export default function UserManagement({ embedded = false }: UserManagementProps
           <CardContent>
             {isError ? (
               <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-                Wallet access data could not be loaded. Apply the Wallet Manager account-access SQL migration in Supabase, then reload this page.
-                {error instanceof Error && <div className="mt-1 text-xs">{error.message}</div>}
+                User list could not be loaded.
+                <div className="mt-1 text-xs">{error instanceof Error ? error.message : String((error as any)?.message || error)}</div>
               </div>
-            ) : isLoading ? (
+            ) : (
+              <>
+            {!walletAccessReady && !isLoading && (
+              <div role="status" className="mb-4 rounded-md border border-amber-500/40 bg-amber-50 p-4 text-sm text-amber-900 dark:bg-amber-950/20 dark:text-amber-200">
+                User list is available, but wallet assignments are disabled until the account-access SQL migration is applied in Supabase.
+                {userManagementData?.walletAccessError && <div className="mt-1 text-xs opacity-80">{userManagementData.walletAccessError}</div>}
+              </div>
+            )}
+            {isLoading ? (
               <div className="space-y-3">
                 {[1, 2, 3].map(i => (
                   <Skeleton key={i} className="h-12 w-full" />
@@ -447,8 +460,8 @@ export default function UserManagement({ embedded = false }: UserManagementProps
                         {user.role === 'ADMIN' ? (
                           <Badge>All wallets</Badge>
                         ) : (
-                          <Button size="sm" variant="outline" onClick={() => openAccountAccess(user)}>
-                            {user.paypalAccountIds.length + user.nepaliAccountIds.length} assigned
+                          <Button size="sm" variant="outline" disabled={!walletAccessReady} onClick={() => openAccountAccess(user)}>
+                            {walletAccessReady ? `${user.paypalAccountIds.length + user.nepaliAccountIds.length} assigned` : 'Unavailable'}
                           </Button>
                         )}
                       </TableCell>
@@ -524,6 +537,8 @@ export default function UserManagement({ embedded = false }: UserManagementProps
                   )}
                 </TableBody>
               </Table>
+            )}
+              </>
             )}
           </CardContent>
         </Card>
