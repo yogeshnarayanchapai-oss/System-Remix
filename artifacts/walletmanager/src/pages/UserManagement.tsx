@@ -35,8 +35,8 @@ interface UserWithRole {
 interface UserManagementProps { embedded?: boolean }
 export default function UserManagement({ embedded = false }: UserManagementProps = {}) {
   const queryClient = useQueryClient();
-  const [editingUserId, setEditingUserId] = useState<string | null>(null);
-  const [accessUser, setAccessUser] = useState<UserWithRole | null>(null);
+  const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
+  const [editRole, setEditRole] = useState<AppRole>('EDITOR');
   const [selectedPaypalIds, setSelectedPaypalIds] = useState<string[]>([]);
   const [selectedNepaliIds, setSelectedNepaliIds] = useState<string[]>([]);
   const [showAddUser, setShowAddUser] = useState(false);
@@ -113,51 +113,40 @@ export default function UserManagement({ embedded = false }: UserManagementProps
   const users = userManagementData?.users;
   const walletAccessReady = userManagementData?.walletAccessReady ?? false;
 
-  // Update user role mutation
-  const updateRoleMutation = useMutation({
-    mutationFn: async ({ userId, newRole }: { userId: string; newRole: AppRole }) => {
-      const { error } = await supabase
+  const updateAccountAccessMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingUser) throw new Error('Select a user first');
+      const { error: roleError } = await supabase
         .from('user_roles')
-        .update({ role: newRole })
-        .eq('user_id', userId);
-      
-      if (error) throw error;
+        .update({ role: editRole })
+        .eq('user_id', editingUser.user_id);
+      if (roleError) throw roleError;
+
+      if (walletAccessReady) {
+        const { error } = await (supabase as any).rpc('walletmanager_replace_user_account_access', {
+        _target_user_id: editingUser.user_id,
+        _paypal_account_ids: selectedPaypalIds,
+        _nepali_account_ids: selectedNepaliIds,
+      });
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users-with-roles'] });
       queryClient.invalidateQueries({ queryKey: ['user-role'] });
-      toast.success('User role updated successfully');
-      setEditingUserId(null);
-    },
-    onError: (error) => {
-      toast.error('Failed to update role: ' + error.message);
-    },
-  });
-
-  const updateAccountAccessMutation = useMutation({
-    mutationFn: async () => {
-      if (!accessUser) throw new Error('Select a user first');
-      const { error } = await (supabase as any).rpc('walletmanager_replace_user_account_access', {
-        _target_user_id: accessUser.user_id,
-        _paypal_account_ids: selectedPaypalIds,
-        _nepali_account_ids: selectedNepaliIds,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users-with-roles'] });
       queryClient.invalidateQueries({ queryKey: ['paypal-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['nepali-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['paypal-accounts-with-balances'] });
       queryClient.invalidateQueries({ queryKey: ['nepali-accounts-with-balances'] });
-      toast.success('Wallet access updated');
-      setAccessUser(null);
+      toast.success('User changes saved');
+      setEditingUser(null);
     },
-    onError: (error: Error) => toast.error(`Could not update wallet access: ${error.message}`),
+    onError: (error: Error) => toast.error(`Could not save user changes: ${error.message}`),
   });
 
-  const openAccountAccess = (user: UserWithRole) => {
-    setAccessUser(user);
+  const openEditUser = (user: UserWithRole) => {
+    setEditingUser(user);
+    setEditRole(user.role);
     setSelectedPaypalIds(user.paypalAccountIds);
     setSelectedNepaliIds(user.nepaliAccountIds);
   };
@@ -265,10 +254,6 @@ export default function UserManagement({ embedded = false }: UserManagementProps
       toast.error('Failed to update status: ' + error.message);
     },
   });
-
-  const handleRoleChange = (userId: string, newRole: AppRole) => {
-    updateRoleMutation.mutate({ userId, newRole });
-  };
 
   const handleAddUser = (e: React.FormEvent) => {
     e.preventDefault();
@@ -433,36 +418,15 @@ export default function UserManagement({ embedded = false }: UserManagementProps
                     <TableRow key={user.user_id}>
                       <TableCell className="font-medium">{user.email}</TableCell>
                       <TableCell>
-                        {editingUserId === user.user_id ? (
-                          <Select
-                            value={user.role}
-                            onValueChange={(value: AppRole) => handleRoleChange(user.user_id, value)}
-                          >
-                            <SelectTrigger className="w-32">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="ADMIN">ADMIN</SelectItem>
-                              <SelectItem value="EDITOR">EDITOR</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Badge
-                            variant={user.role === 'ADMIN' ? 'default' : 'secondary'}
-                            className="cursor-pointer"
-                            onClick={() => setEditingUserId(user.user_id)}
-                          >
-                            {user.role}
-                          </Badge>
-                        )}
+                        <Badge variant={user.role === 'ADMIN' ? 'default' : 'secondary'}>{user.role}</Badge>
                       </TableCell>
                       <TableCell>
                         {user.role === 'ADMIN' ? (
                           <Badge>All wallets</Badge>
                         ) : (
-                          <Button size="sm" variant="outline" disabled={!walletAccessReady} onClick={() => openAccountAccess(user)}>
+                          <span className="text-sm text-muted-foreground">
                             {walletAccessReady ? `${user.paypalAccountIds.length + user.nepaliAccountIds.length} assigned` : 'Unavailable'}
-                          </Button>
+                          </span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -484,6 +448,8 @@ export default function UserManagement({ embedded = false }: UserManagementProps
                         {format(new Date(user.created_at), 'MMM d, yyyy')}
                       </TableCell>
                       <TableCell>
+                        <div className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" onClick={() => openEditUser(user)}>Edit</Button>
                         <Dialog 
                           open={showChangePassword === user.user_id} 
                           onOpenChange={(open) => {
@@ -525,6 +491,7 @@ export default function UserManagement({ embedded = false }: UserManagementProps
                             </form>
                           </DialogContent>
                         </Dialog>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -542,11 +509,28 @@ export default function UserManagement({ embedded = false }: UserManagementProps
             )}
           </CardContent>
         </Card>
-        <Dialog open={!!accessUser} onOpenChange={(open) => !open && setAccessUser(null)}>
+        <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
           <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Wallet access — {accessUser?.email}</DialogTitle>
+              <DialogTitle>Edit user — {editingUser?.email}</DialogTitle>
             </DialogHeader>
+            <div className="space-y-5">
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <Select value={editRole} onValueChange={(value: AppRole) => setEditRole(value)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ADMIN">ADMIN</SelectItem>
+                    <SelectItem value="EDITOR">EDITOR</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {!walletAccessReady && (
+                <div role="status" className="rounded-md border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/20 dark:text-amber-200">
+                  Role can be saved now. Wallet choices will be editable after the account-access migration is applied in Supabase.
+                </div>
+              )}
+            </div>
             <div className="grid gap-6 sm:grid-cols-2">
               <section className="space-y-3">
                 <h3 className="font-medium">USD wallets</h3>
@@ -555,6 +539,7 @@ export default function UserManagement({ embedded = false }: UserManagementProps
                   <label key={account.id} className="flex cursor-pointer items-center gap-3 rounded-md border p-3">
                     <Checkbox
                       checked={selectedPaypalIds.includes(account.id)}
+                      disabled={!walletAccessReady || editRole === 'ADMIN'}
                       onCheckedChange={(checked) => setSelectedPaypalIds((ids) =>
                         checked ? [...new Set([...ids, account.id])] : ids.filter((id) => id !== account.id)
                       )}
@@ -570,6 +555,7 @@ export default function UserManagement({ embedded = false }: UserManagementProps
                   <label key={account.id} className="flex cursor-pointer items-center gap-3 rounded-md border p-3">
                     <Checkbox
                       checked={selectedNepaliIds.includes(account.id)}
+                      disabled={!walletAccessReady || editRole === 'ADMIN'}
                       onCheckedChange={(checked) => setSelectedNepaliIds((ids) =>
                         checked ? [...new Set([...ids, account.id])] : ids.filter((id) => id !== account.id)
                       )}
@@ -580,9 +566,9 @@ export default function UserManagement({ embedded = false }: UserManagementProps
               </section>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setAccessUser(null)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setEditingUser(null)}>Cancel</Button>
               <Button onClick={() => updateAccountAccessMutation.mutate()} disabled={updateAccountAccessMutation.isPending}>
-                {updateAccountAccessMutation.isPending ? 'Saving...' : 'Save access'}
+                {updateAccountAccessMutation.isPending ? 'Saving...' : 'Save changes'}
               </Button>
             </DialogFooter>
           </DialogContent>
