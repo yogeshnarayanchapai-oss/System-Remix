@@ -12,13 +12,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Users, Shield, Edit3, Plus, Key, UserX, UserCheck } from 'lucide-react';
+import { Check, ChevronsUpDown, Users, Shield, Edit3, Plus, Key, UserX, UserCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { usePaypalAccounts } from '@/hooks/usePaypalAccounts';
 import { useNepaliAccounts } from '@/hooks/useNepaliAccounts';
+import { cn } from '@/lib/utils';
 
 type AppRole = 'ADMIN' | 'EDITOR';
 
@@ -33,6 +35,94 @@ interface UserWithRole {
 }
 
 interface UserManagementProps { embedded?: boolean }
+
+interface AccountChoice {
+  id: string;
+  name: string;
+}
+
+function AccountAccessPicker({
+  title,
+  placeholder,
+  accounts,
+  selectedIds,
+  disabled,
+  onToggle,
+}: {
+  title: string;
+  placeholder: string;
+  accounts: AccountChoice[];
+  selectedIds: string[];
+  disabled: boolean;
+  onToggle: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedAccounts = accounts.filter((account) => selectedIds.includes(account.id));
+
+  return (
+    <section className="min-w-0 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="font-medium">{title}</h3>
+        <span className="text-xs text-muted-foreground">{selectedAccounts.length} selected</span>
+      </div>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            disabled={disabled}
+            className="w-full justify-between font-normal"
+          >
+            <span className="truncate">
+              {selectedAccounts.length ? `${selectedAccounts.length} wallet${selectedAccounts.length === 1 ? '' : 's'} selected` : placeholder}
+            </span>
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
+          <Command>
+            <CommandInput placeholder={`Search ${title.toLowerCase()}...`} />
+            <CommandList>
+              <CommandEmpty>No wallet found.</CommandEmpty>
+              <CommandGroup>
+                {accounts.map((account) => {
+                  const checked = selectedIds.includes(account.id);
+                  return (
+                    <CommandItem
+                      key={account.id}
+                      value={account.name}
+                      onSelect={() => onToggle(account.id)}
+                      className="gap-2"
+                    >
+                      <span className={cn(
+                        'flex h-4 w-4 items-center justify-center rounded-sm border',
+                        checked ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40',
+                      )}>
+                        {checked && <Check className="h-3 w-3" />}
+                      </span>
+                      <span className="truncate">{account.name}</span>
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+      {selectedAccounts.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {selectedAccounts.map((account) => (
+            <Badge key={account.id} variant="secondary" className="max-w-full truncate">{account.name}</Badge>
+          ))}
+        </div>
+      )}
+      {!accounts.length && <p className="text-xs text-muted-foreground">No wallets configured.</p>}
+    </section>
+  );
+}
+
 export default function UserManagement({ embedded = false }: UserManagementProps = {}) {
   const queryClient = useQueryClient();
   const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
@@ -532,38 +622,26 @@ export default function UserManagement({ embedded = false }: UserManagementProps
               )}
             </div>
             <div className="grid gap-6 sm:grid-cols-2">
-              <section className="space-y-3">
-                <h3 className="font-medium">USD wallets</h3>
-                {!paypalAccounts?.length && <p className="text-sm text-muted-foreground">No active USD wallets.</p>}
-                {paypalAccounts?.map((account) => (
-                  <label key={account.id} className="flex cursor-pointer items-center gap-3 rounded-md border p-3">
-                    <Checkbox
-                      checked={selectedPaypalIds.includes(account.id)}
-                      disabled={!walletAccessReady || editRole === 'ADMIN'}
-                      onCheckedChange={(checked) => setSelectedPaypalIds((ids) =>
-                        checked ? [...new Set([...ids, account.id])] : ids.filter((id) => id !== account.id)
-                      )}
-                    />
-                    <span>{account.paypal_name}</span>
-                  </label>
-                ))}
-              </section>
-              <section className="space-y-3">
-                <h3 className="font-medium">NPR wallets</h3>
-                {!nepaliAccounts?.length && <p className="text-sm text-muted-foreground">No active NPR wallets.</p>}
-                {nepaliAccounts?.map((account) => (
-                  <label key={account.id} className="flex cursor-pointer items-center gap-3 rounded-md border p-3">
-                    <Checkbox
-                      checked={selectedNepaliIds.includes(account.id)}
-                      disabled={!walletAccessReady || editRole === 'ADMIN'}
-                      onCheckedChange={(checked) => setSelectedNepaliIds((ids) =>
-                        checked ? [...new Set([...ids, account.id])] : ids.filter((id) => id !== account.id)
-                      )}
-                    />
-                    <span>{account.name}</span>
-                  </label>
-                ))}
-              </section>
+              <AccountAccessPicker
+                title="USD wallets"
+                placeholder="Search and select USD wallets"
+                accounts={(paypalAccounts || []).map((account) => ({ id: account.id, name: account.paypal_name }))}
+                selectedIds={selectedPaypalIds}
+                disabled={!walletAccessReady || editRole === 'ADMIN'}
+                onToggle={(id) => setSelectedPaypalIds((ids) =>
+                  ids.includes(id) ? ids.filter((current) => current !== id) : [...ids, id]
+                )}
+              />
+              <AccountAccessPicker
+                title="NPR wallets"
+                placeholder="Search and select NPR wallets"
+                accounts={(nepaliAccounts || []).map((account) => ({ id: account.id, name: account.name }))}
+                selectedIds={selectedNepaliIds}
+                disabled={!walletAccessReady || editRole === 'ADMIN'}
+                onToggle={(id) => setSelectedNepaliIds((ids) =>
+                  ids.includes(id) ? ids.filter((current) => current !== id) : [...ids, id]
+                )}
+              />
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditingUser(null)}>Cancel</Button>
