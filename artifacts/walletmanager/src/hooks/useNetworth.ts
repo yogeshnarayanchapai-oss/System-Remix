@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { NetworthGroup, NetworthType } from '@/lib/networthFormat';
+import { useAuth } from './useAuth';
 
 export interface NetworthCategory {
   id: string;
@@ -45,6 +46,121 @@ export interface NetworthSettings {
   usd_npr_rate: number;
   usd_npr_updated_at: string | null;
   updated_at: string;
+}
+
+interface NetworthBalanceEvent {
+  date: string;
+  delta: number;
+}
+
+export interface NetworthWalletHistory {
+  usdOpeningBalance: number;
+  usdEvents: NetworthBalanceEvent[];
+  nprOpeningBalance: number;
+  nprEvents: NetworthBalanceEvent[];
+}
+
+async function fetchNetworthPages<T>(
+  fetchPage: (from: number, to: number) => PromiseLike<{
+    data: T[] | null;
+    error: { message: string } | null;
+  }>,
+): Promise<T[]> {
+  const all: T[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await fetchPage(from, from + pageSize - 1);
+    if (error) throw error;
+    const rows = data || [];
+    all.push(...rows);
+    if (rows.length < pageSize) return all;
+  }
+}
+
+/**
+ * Rebuilds USD and NPR wallet balances at any past date from opening balances
+ * and dated transactions/transfers. The configured USD rate is applied by the
+ * dashboard because the project does not store historical exchange rates.
+ */
+export function useNetworthWalletHistory() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['networth-wallet-history', user?.id],
+    staleTime: 30_000,
+    queryFn: async (): Promise<NetworthWalletHistory> => {
+      const [usdAccounts, usdTransactions, usdTransfers, nprAccounts, nprEntries] = await Promise.all([
+        fetchNetworthPages((from, to) => supabase
+          .from('paypal_accounts')
+          .select('id, opening_balance_amount')
+          .order('id')
+          .range(from, to)),
+        fetchNetworthPages((from, to) => supabase
+          .from('transactions')
+          .select('id, paypal_account_id, txn_date, txn_type, amount')
+          .order('txn_date')
+          .order('id')
+          .range(from, to)),
+        fetchNetworthPages((from, to) => supabase
+          .from('wallet_transfers')
+          .select('id, from_wallet_id, to_wallet_id, transfer_date, amount, total')
+          .order('transfer_date')
+          .order('id')
+          .range(from, to)),
+        fetchNetworthPages((from, to) => supabase
+          .from('nepali_accounts')
+          .select('id, opening_balance_npr, status')
+          .eq('status', 'ACTIVE')
+          .order('id')
+          .range(from, to)),
+        fetchNetworthPages((from, to) => supabase
+          .from('nepali_account_ledger')
+          .select('id, nepali_account_id, entry_date, entry_type, amount_npr')
+          .order('entry_date')
+          .order('id')
+          .range(from, to)),
+      ]);
+
+      const activeNprIds = new Set(nprAccounts.map((account) => account.id));
+      const usdEvents: NetworthBalanceEvent[] = [];
+      for (const transaction of usdTransactions) {
+        if (!transaction.paypal_account_id) continue;
+        const amount = Number(transaction.amount) || 0;
+        usdEvents.push({
+          date: transaction.txn_date,
+          delta: transaction.txn_type === 'INCOMING' ? amount : -amount,
+        });
+      }
+      for (const transfer of usdTransfers) {
+        const amount = Number(transfer.amount) || 0;
+        if (transfer.from_wallet_id) {
+          usdEvents.push({
+            date: transfer.transfer_date,
+            delta: -(Number(transfer.total ?? amount) || 0),
+          });
+        }
+        if (transfer.to_wallet_id) {
+          usdEvents.push({ date: transfer.transfer_date, delta: amount });
+        }
+      }
+
+      const nprEvents: NetworthBalanceEvent[] = [];
+      for (const entry of nprEntries) {
+        if (!entry.nepali_account_id || !activeNprIds.has(entry.nepali_account_id)) continue;
+        const amount = Number(entry.amount_npr) || 0;
+        nprEvents.push({
+          date: entry.entry_date,
+          delta: entry.entry_type === 'CREDIT' || entry.entry_type === 'TRANSFER_IN' ? amount : -amount,
+        });
+      }
+
+      return {
+        usdOpeningBalance: usdAccounts.reduce((sum, account) => sum + (Number(account.opening_balance_amount) || 0), 0),
+        usdEvents,
+        nprOpeningBalance: nprAccounts.reduce((sum, account) => sum + (Number(account.opening_balance_npr) || 0), 0),
+        nprEvents,
+      };
+    },
+  });
 }
 
 // Activity log helper for Net Worth actions

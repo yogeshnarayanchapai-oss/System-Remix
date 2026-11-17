@@ -12,23 +12,51 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
   BarChart, Bar, Legend,
 } from 'recharts';
-import { TrendingUp, TrendingDown, Wallet, Target, Download, Banknote } from 'lucide-react';
-import { useNetworthEntries, useNetworthSettings, useNetworthCategories } from '@/hooks/useNetworth';
-import { usePaypalSummary } from '@/hooks/useDashboard';
-import { useTotalNprBalance } from '@/hooks/useNepaliAccounts';
-import { formatNprShort, formatNprFull, NETWORTH_GROUPS } from '@/lib/networthFormat';
-import { format, subMonths, subYears, parseISO, startOfMonth, endOfMonth } from 'date-fns';
+import { TrendingUp, TrendingDown, Wallet, Target, Banknote } from 'lucide-react';
+import {
+  useNetworthEntries, useNetworthSettings, useNetworthCategories,
+  useNetworthWalletHistory, type NetworthEntry, type NetworthWalletHistory,
+} from '@/hooks/useNetworth';
+import { formatNprShort, formatNprFull } from '@/lib/networthFormat';
+import { endOfMonth, endOfYear, format, parseISO, startOfMonth, subMonths, subYears } from 'date-fns';
 import { toast } from 'sonner';
+
+function balanceAtDate(opening: number, events: { date: string; delta: number }[], cutoff: string) {
+  return opening + events.reduce((sum, event) => sum + (event.date <= cutoff ? event.delta : 0), 0);
+}
+
+function netWorthAtDate(
+  cutoff: string,
+  entries: NetworthEntry[],
+  walletHistory: NetworthWalletHistory | undefined,
+  usdNprRate: number,
+) {
+  const usdBalance = walletHistory
+    ? balanceAtDate(walletHistory.usdOpeningBalance, walletHistory.usdEvents, cutoff)
+    : 0;
+  const nprBalance = walletHistory
+    ? balanceAtDate(walletHistory.nprOpeningBalance, walletHistory.nprEvents, cutoff)
+    : 0;
+  const recordedAssetsAndLiabilities = entries.reduce((sum, entry) => {
+    if (entry.entry_date > cutoff) return sum;
+    const amount = Number(entry.amount_npr) || 0;
+    return sum + (entry.type === 'ASSET' ? amount : -amount);
+  }, 0);
+  return usdBalance * usdNprRate + nprBalance + recordedAssetsAndLiabilities;
+}
 
 export default function NetworthDashboard() {
   const { data: entries = [] } = useNetworthEntries();
   const { data: settings } = useNetworthSettings();
   const { data: categories = [] } = useNetworthCategories();
-  const { data: walletSummary = [] } = usePaypalSummary();
-  const { totalBalance: totalNpr } = useTotalNprBalance();
+  const { data: walletHistory } = useNetworthWalletHistory();
   const usdRate = Number(settings?.usd_npr_rate) || 0;
-  const totalUsd = walletSummary.reduce((s, w) => s + Number(w.balance || 0), 0);
-  const handCashNpr = totalUsd * usdRate + Number(totalNpr || 0);
+  const now = new Date();
+  const todayString = format(now, 'yyyy-MM-dd');
+  const handCashNpr = walletHistory
+    ? balanceAtDate(walletHistory.usdOpeningBalance, walletHistory.usdEvents, todayString) * usdRate
+      + balanceAtDate(walletHistory.nprOpeningBalance, walletHistory.nprEvents, todayString)
+    : 0;
   const todayDate = new Date();
   const thisMonthFrom = format(startOfMonth(todayDate), 'yyyy-MM-dd');
   const thisMonthTo = format(endOfMonth(todayDate), 'yyyy-MM-dd');
@@ -74,43 +102,62 @@ export default function NetworthDashboard() {
     let assets = 0;
     let liabilities = 0;
     for (const e of entries) {
+      if (e.entry_date > todayString) continue;
       if (e.type === 'ASSET') assets += Number(e.amount_npr);
       else liabilities += Number(e.amount_npr);
     }
-    return { assets, liabilities, networth: handCashNpr + assets - liabilities };
-  }, [entries, handCashNpr]);
+    return {
+      assets,
+      liabilities,
+      networth: netWorthAtDate(todayString, entries, walletHistory, usdRate),
+    };
+  }, [entries, todayString, walletHistory, usdRate]);
 
   const netWorthAsOf = (cutoff: Date): number => {
-    let v = 0;
-    for (const e of entries) {
-      if (parseISO(e.entry_date) <= cutoff) {
-        v += e.type === 'ASSET' ? Number(e.amount_npr) : -Number(e.amount_npr);
-      }
-    }
-    return v;
+    return netWorthAtDate(format(cutoff, 'yyyy-MM-dd'), entries, walletHistory, usdRate);
   };
 
-  const now = new Date();
   const lastMonth = netWorthAsOf(subMonths(now, 1));
   const lastYear = netWorthAsOf(subYears(now, 1));
   const monthlyGrowth = totals.networth - lastMonth;
   const yearlyGrowth = totals.networth - lastYear;
   const yearlyGrowthPct = lastYear !== 0 ? (yearlyGrowth / Math.abs(lastYear)) * 100 : 0;
 
-  const networthByYear = useMemo(() => {
-    if (entries.length === 0) return [] as { year: string; value: number }[];
-    const years = Array.from(
-      new Set(entries.map((e) => parseISO(e.entry_date).getFullYear())),
-    ).sort();
-    const minYear = years[0];
-    const maxYear = Math.max(years[years.length - 1], now.getFullYear());
-    const result: { year: string; value: number }[] = [];
-    for (let y = minYear; y <= maxYear; y++) {
-      const cutoff = new Date(y, 11, 31);
-      result.push({ year: String(y), value: netWorthAsOf(cutoff) });
+  const [chartRange, setChartRange] = useState<'MONTH' | 'YEAR'>('MONTH');
+  const networthChartData = useMemo(() => {
+    if (chartRange === 'MONTH') {
+      return Array.from({ length: 12 }, (_, index) => {
+        const monthStart = startOfMonth(subMonths(now, 11 - index));
+        const isCurrentMonth = monthStart.getFullYear() === now.getFullYear()
+          && monthStart.getMonth() === now.getMonth();
+        const cutoff = isCurrentMonth ? todayString : format(endOfMonth(monthStart), 'yyyy-MM-dd');
+        return {
+          period: format(monthStart, 'MMM yy'),
+          value: netWorthAtDate(cutoff, entries, walletHistory, usdRate),
+        };
+      });
     }
-    return result;
-  }, [entries]);
+
+    const dates = [
+      ...entries.map((entry) => entry.entry_date),
+      ...(walletHistory?.usdEvents.map((event) => event.date) || []),
+      ...(walletHistory?.nprEvents.map((event) => event.date) || []),
+    ];
+    const firstYear = dates.reduce(
+      (earliest, date) => Math.min(earliest, Number(date.slice(0, 4))),
+      now.getFullYear(),
+    );
+    return Array.from({ length: now.getFullYear() - firstYear + 1 }, (_, index) => {
+      const year = firstYear + index;
+      const cutoff = year === now.getFullYear()
+        ? todayString
+        : format(endOfYear(new Date(year, 0, 1)), 'yyyy-MM-dd');
+      return {
+        period: String(year),
+        value: netWorthAtDate(cutoff, entries, walletHistory, usdRate),
+      };
+    });
+  }, [chartRange, entries, walletHistory, usdRate, todayString, now]);
 
   const monthlyData = useMemo(() => {
     const year = now.getFullYear();
@@ -119,12 +166,13 @@ export default function NetworthDashboard() {
     for (const e of entries) {
       const d = parseISO(e.entry_date);
       if (d.getFullYear() !== year) continue;
+      if (e.entry_date > todayString) continue;
       const idx = d.getMonth();
       if (e.type === 'ASSET') buckets[idx].income += Number(e.amount_npr);
       else buckets[idx].expense += Number(e.amount_npr);
     }
     return buckets;
-  }, [entries]);
+  }, [entries, todayString]);
 
   const goalProgress = useMemo(() => {
     if (!settings || settings.goal_target_npr <= settings.goal_start_npr) return 0;
@@ -267,6 +315,31 @@ export default function NetworthDashboard() {
           />
         </div>
 
+        <Card className="mb-6">
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
+            <CardTitle>Net Worth Growth</CardTitle>
+            <div className="flex gap-2" role="group" aria-label="Net worth chart period">
+              <Button type="button" size="sm" variant={chartRange === 'MONTH' ? 'default' : 'outline'} onClick={() => setChartRange('MONTH')}>By Month</Button>
+              <Button type="button" size="sm" variant={chartRange === 'YEAR' ? 'default' : 'outline'} onClick={() => setChartRange('YEAR')}>By Year</Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={networthChartData}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="period" />
+                <YAxis tickFormatter={formatNprShort} width={80} />
+                <Tooltip formatter={(value: number) => formatNprFull(value)} />
+                <Line type="monotone" dataKey="value" name="Net Worth" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+              </LineChart>
+            </ResponsiveContainer>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {chartRange === 'MONTH' ? 'Monthly closing values for the last 12 months.' : 'Year-end values; current year is through today.'}
+              {' '}USD wallets use the current configured NPR exchange rate.
+            </p>
+          </CardContent>
+        </Card>
+
         <div className="mb-6 grid gap-4 md:grid-cols-3">
           <Card className="md:col-span-2">
             <CardHeader>
@@ -321,22 +394,7 @@ export default function NetworthDashboard() {
           </Card>
         </div>
 
-        <div className="mb-6 grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader><CardTitle>Net Worth Growth</CardTitle></CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={networthByYear}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="year" />
-                  <YAxis tickFormatter={formatNprShort} width={80} />
-                  <Tooltip formatter={(v: number) => formatNprFull(v)} />
-                  <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
+        <div className="mb-6 grid gap-4">
           <Card>
             <CardHeader><CardTitle>Monthly Assets vs Liabilities Added ({now.getFullYear()})</CardTitle></CardHeader>
             <CardContent>
