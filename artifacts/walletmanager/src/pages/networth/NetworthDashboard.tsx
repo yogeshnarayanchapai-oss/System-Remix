@@ -132,7 +132,7 @@ export default function NetworthDashboard() {
           && monthStart.getMonth() === now.getMonth();
         const cutoff = isCurrentMonth ? todayString : format(endOfMonth(monthStart), 'yyyy-MM-dd');
         return {
-          period: format(monthStart, 'MMM yy'),
+          period: format(monthStart, 'MMM'),
           value: netWorthAtDate(cutoff, entries, walletHistory, usdRate),
         };
       });
