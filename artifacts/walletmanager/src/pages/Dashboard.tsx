@@ -35,6 +35,7 @@ import { PartyLedgerModal } from '@/components/party/PartyLedgerModal';
 import { NepaliAccountSelect } from '@/components/nepali-accounts/NepaliAccountSelect';
 import { DaybookModal } from '@/components/daybook/DaybookModal';
 import { PartySummary } from '@/lib/types';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type SortBy = 'recent' | 'total' | 'unsettled';
 
@@ -59,7 +60,7 @@ export default function Dashboard() {
   const { isAdmin, isEditor } = useUserRole();
   const { isVisible: showSensitive, MASK } = useSensitiveDataVisibility();
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
-  const { data: partySummary, isLoading: partyLoading } = usePartySummary();
+  const { data: partySummary, isLoading: partyLoading, error: partyError } = usePartySummary();
   const settleAll = useSettleAllParty();
   const { totalBalance: totalNprBalance, isLoading: nprBalanceLoading } = useTotalNprBalance();
   const { data: usdAccounts, isLoading: usdAccountsLoading } = usePaypalAccounts();
@@ -216,10 +217,16 @@ export default function Dashboard() {
           </div>
         </CardHeader>
         <CardContent>
+          {partyError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertTitle>Party balances unavailable</AlertTitle>
+              <AlertDescription>Wallet access could not be verified. Check the account-access migration, then reload.</AlertDescription>
+            </Alert>
+          )}
           <div className="mb-4 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-lg bg-success/10 p-3 text-center"><p className="text-xs text-muted-foreground">Total Receivable (लिनुपर्ने)</p><p className="text-base font-bold text-success sm:text-lg" title={`${formatNPR(partyTotals.receivable)} NPR`} aria-label={`Total receivable ${formatNPR(partyTotals.receivable)} NPR`}>{formatCompactNPR(partyTotals.receivable)}</p></div>
-            <div className="rounded-lg bg-payable/10 p-3 text-center"><p className="text-xs text-muted-foreground">Total Payable (दिनुपर्ने)</p><p className="text-base font-bold text-payable sm:text-lg" title={`${formatNPR(partyTotals.payable)} NPR`} aria-label={`Total payable ${formatNPR(partyTotals.payable)} NPR`}>{formatCompactNPR(partyTotals.payable)}</p></div>
-            <div className="rounded-lg bg-primary/10 p-3 text-center"><p className="text-xs text-muted-foreground">Net Position</p><p className="text-base font-bold text-primary sm:text-lg" title={`${formatNPR(partyTotals.receivable - partyTotals.payable)} NPR`} aria-label={`Net position ${formatNPR(partyTotals.receivable - partyTotals.payable)} NPR`}>{formatCompactNPR(partyTotals.receivable - partyTotals.payable)}</p></div>
+            <div className="rounded-lg bg-success/10 p-3 text-center"><p className="text-xs text-muted-foreground">Total Receivable (लिनुपर्ने)</p><p className="text-base font-bold text-success sm:text-lg" title={partyError ? 'Unavailable' : `${formatNPR(partyTotals.receivable)} NPR`} aria-label={partyError ? 'Receivables unavailable' : `Total receivable ${formatNPR(partyTotals.receivable)} NPR`}>{partyError ? 'Unavailable' : formatCompactNPR(partyTotals.receivable)}</p></div>
+            <div className="rounded-lg bg-payable/10 p-3 text-center"><p className="text-xs text-muted-foreground">Total Payable (दिनुपर्ने)</p><p className="text-base font-bold text-payable sm:text-lg" title={partyError ? 'Unavailable' : `${formatNPR(partyTotals.payable)} NPR`} aria-label={partyError ? 'Payables unavailable' : `Total payable ${formatNPR(partyTotals.payable)} NPR`}>{partyError ? 'Unavailable' : formatCompactNPR(partyTotals.payable)}</p></div>
+            <div className="rounded-lg bg-primary/10 p-3 text-center"><p className="text-xs text-muted-foreground">Net Position</p><p className="text-base font-bold text-primary sm:text-lg" title={partyError ? 'Unavailable' : `${formatNPR(partyTotals.receivable - partyTotals.payable)} NPR`} aria-label={partyError ? 'Net position unavailable' : `Net position ${formatNPR(partyTotals.receivable - partyTotals.payable)} NPR`}>{partyError ? 'Unavailable' : formatCompactNPR(partyTotals.receivable - partyTotals.payable)}</p></div>
           </div>
           <div className="table-container max-h-[300px]">
             <Table><TableHeader className="table-sticky-header"><TableRow><TableHead>Party Name</TableHead><TableHead className="text-right">Receivable (NPR)</TableHead><TableHead className="text-right">Payable (NPR)</TableHead><TableHead className="text-center">Entries</TableHead><TableHead>Status</TableHead><TableHead className="w-[120px]">Actions</TableHead></TableRow></TableHeader>

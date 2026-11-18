@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { DashboardStats, PaypalSummary, EmailPerformance, PartySummary } from '@/lib/types';
 import { format, subDays } from 'date-fns';
+import { useAuth } from './useAuth';
+import { useUserRole } from './useUserRole';
 
 /**
  * Dashboard stats - ALL VALUES IN USD (uses amount, not total)
@@ -398,9 +400,39 @@ export function useEmailsWithNoActivity(dateFrom?: string, dateTo?: string) {
  * - INCOMING = We received money = We owe them = PAYABLE (दिनुपर्ने)
  */
 export function usePartySummary() {
-  return useQuery({
-    queryKey: ['dashboard', 'party-summary-v2'],
+  const { user } = useAuth();
+  const { isAdmin, isLoading: roleLoading } = useUserRole();
+  const accessQuery = useQuery({
+    queryKey: ['user-npr-account-access', user?.id],
+    enabled: !!user?.id && !roleLoading && !isAdmin,
+    queryFn: async (): Promise<string[]> => {
+      if (!user?.id) return [];
+      const { data, error } = await (supabase as any)
+        .from('user_account_access')
+        .select('nepali_account_id')
+        .eq('user_id', user.id);
+
+      if (error) {
+        throw new Error(`Could not verify wallet access: ${error.message}`);
+      }
+
+      return [...new Set<string>(
+        (data || [])
+          .map((row: { nepali_account_id: string | null }) => row.nepali_account_id)
+          .filter((id: string | null): id is string => !!id),
+      )];
+    },
+  });
+  const assignedNepaliAccountIds = accessQuery.data || [];
+  const scopeLoading = roleLoading || (!isAdmin && (accessQuery.isLoading || accessQuery.isFetching));
+  const scopeError = !isAdmin ? accessQuery.error : null;
+
+  const summaryQuery = useQuery({
+    queryKey: ['dashboard', 'party-summary-v3', user?.id, isAdmin, isAdmin ? 'all' : assignedNepaliAccountIds],
+    enabled: !!user?.id && !scopeLoading && !scopeError,
     queryFn: async (): Promise<PartySummary[]> => {
+      if (!user?.id) return [];
+
       // Get all parties
       const { data: parties, error: partiesError } = await supabase
         .from('parties')
@@ -409,22 +441,35 @@ export function usePartySummary() {
       
       if (partiesError) throw partiesError;
 
-      // Get ALL party_transactions for calculations (paginate to avoid 1000-row limit)
-      let allPartyTransactions: Array<{ party_id: string; entry_type: string; amount_npr: number; created_at: string }> = [];
+      // Get scoped party_transactions for calculations (paginate to avoid 1000-row limit)
+      let allPartyTransactions: Array<{
+        party_id: string;
+        entry_type: string;
+        amount_npr: number;
+        created_at: string;
+        nepali_account_id: string | null;
+      }> = [];
       let from = 0;
       const pageSize = 1000;
-      while (true) {
-        const { data: batch, error: ptError } = await supabase
-          .from('party_transactions')
-          .select('party_id, entry_type, amount_npr, created_at')
-          .order('id', { ascending: true })
-          .range(from, from + pageSize - 1);
-        
-        if (ptError) throw ptError;
-        if (!batch || batch.length === 0) break;
-        allPartyTransactions = allPartyTransactions.concat(batch);
-        if (batch.length < pageSize) break;
-        from += pageSize;
+      if (isAdmin || assignedNepaliAccountIds.length > 0) {
+        while (true) {
+          let transactionQuery = supabase
+            .from('party_transactions')
+            .select('party_id, entry_type, amount_npr, created_at, nepali_account_id')
+            .order('id', { ascending: true })
+            .range(from, from + pageSize - 1);
+
+          if (!isAdmin) {
+            transactionQuery = transactionQuery.in('nepali_account_id', assignedNepaliAccountIds);
+          }
+
+          const { data: batch, error: ptError } = await transactionQuery;
+          if (ptError) throw ptError;
+          if (!batch || batch.length === 0) break;
+          allPartyTransactions = allPartyTransactions.concat(batch);
+          if (batch.length < pageSize) break;
+          from += pageSize;
+        }
       }
       const partyTransactions = allPartyTransactions;
 
@@ -475,4 +520,11 @@ export function usePartySummary() {
       }) || [];
     },
   });
+
+  return {
+    ...summaryQuery,
+    data: scopeLoading || scopeError ? undefined : summaryQuery.data,
+    error: scopeError || summaryQuery.error,
+    isLoading: scopeLoading || summaryQuery.isLoading,
+  };
 }

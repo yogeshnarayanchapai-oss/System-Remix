@@ -16,6 +16,7 @@ import { StatCard } from '@/components/ui/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -32,7 +33,7 @@ export default function ReceivablePayable() {
   const [viewLedger, setViewLedger] = useState<PartySummary | null>(null);
   const [activeTab, setActiveTab] = useState('summary');
 
-  const { data: partySummary, isLoading } = usePartySummary();
+  const { data: partySummary, isLoading, error: partyError } = usePartySummary();
 
   // Filter parties
   const filteredParties = partySummary?.filter(p => {
@@ -69,25 +70,31 @@ export default function ReceivablePayable() {
         title="Receivable / Payable" 
         description="Track what you owe and what's owed to you (NPR = USD × Rate)"
       />
+      {partyError && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertTitle>Party balances unavailable</AlertTitle>
+          <AlertDescription>Wallet access could not be verified. Check the account-access migration, then reload.</AlertDescription>
+        </Alert>
+      )}
 
       {/* Summary Cards - NPR */}
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           title={`${labels.receivable} (NPR)`}
-          value={formatNPR(totals.receivable)}
+          value={partyError ? 'Unavailable' : formatNPR(totals.receivable)}
           subtitle="Sum of OUTGOING (unsettled)"
           icon={<ArrowUpRight className="h-5 w-5 text-receivable" />}
         />
         <StatCard
           title={`${labels.payable} (NPR)`}
-          value={formatNPR(totals.payable)}
+          value={partyError ? 'Unavailable' : formatNPR(totals.payable)}
           subtitle="Sum of INCOMING (unsettled)"
           icon={<ArrowDownLeft className="h-5 w-5 text-payable" />}
         />
         <StatCard
           title="Net Position (NPR)"
-          value={formatNPR(totals.receivable - totals.payable)}
-          subtitle={totals.receivable > totals.payable ? labels.receivable : totals.receivable < totals.payable ? labels.payable : 'Balanced'}
+          value={partyError ? 'Unavailable' : formatNPR(totals.receivable - totals.payable)}
+          subtitle={partyError ? 'Wallet access unavailable' : totals.receivable > totals.payable ? labels.receivable : totals.receivable < totals.payable ? labels.payable : 'Balanced'}
           variant="primary"
           icon={<Scale className="h-5 w-5 text-primary-foreground" />}
         />

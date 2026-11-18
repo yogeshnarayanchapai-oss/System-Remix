@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -54,7 +55,7 @@ export default function Parties() {
   const isAdmin = user && role === "ADMIN";
 
   const { data: parties, isLoading } = useParties();
-  const { data: partySummary } = usePartySummary();
+  const { data: partySummary, error: partySummaryError } = usePartySummary();
   
   const createParty = useCreateParty();
   const updateParty = useUpdateParty();
@@ -169,6 +170,12 @@ export default function Parties() {
           </Button>
         }
       />
+      {partySummaryError && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertTitle>Party balances unavailable</AlertTitle>
+          <AlertDescription>Wallet access could not be verified. Check the account-access migration, then reload.</AlertDescription>
+        </Alert>
+      )}
 
       {/* Search */}
       <Card className="mb-6">
