@@ -20,7 +20,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usePartyBalanceTotals, usePartySummary } from '@/hooks/useDashboard';
+import { usePartyBalanceSummary, usePartyBalanceTotals } from '@/hooks/useDashboard';
 import { formatNPR } from '@/lib/format';
 import { PartySummary } from '@/lib/types';
 import { PartyLedgerModal } from '@/components/party/PartyLedgerModal';
@@ -33,7 +33,7 @@ export default function ReceivablePayable() {
   const [viewLedger, setViewLedger] = useState<PartySummary | null>(null);
   const [activeTab, setActiveTab] = useState('summary');
 
-  const { data: partySummary, isLoading, error: partyError } = usePartySummary();
+  const { data: partySummary, isLoading, error: partySummaryError } = usePartyBalanceSummary();
   const { data: partyTotals, error: partyTotalsError } = usePartyBalanceTotals();
 
   // Filter parties
@@ -67,12 +67,11 @@ export default function ReceivablePayable() {
         title="Receivable / Payable" 
         description="Track what you owe and what's owed to you (NPR = USD × Rate)"
       />
-      {(partyError || partyTotalsError) && (
+      {(partySummaryError || partyTotalsError) && (
         <Alert variant="destructive" className="mb-4">
           <AlertTitle>Some party balance data is unavailable</AlertTitle>
           <AlertDescription>
-            {partyError && 'Party details and transactions require the account-access migration and only include assigned NPR wallets. '}
-            {partyTotalsError && 'Global receivable/payable totals require the party-summary migration.'}
+            {(partySummaryError || partyTotalsError) && 'Per-party and global receivable/payable summaries require the party-summary migration.'}
           </AlertDescription>
         </Alert>
       )}

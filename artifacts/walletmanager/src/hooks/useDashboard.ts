@@ -553,3 +553,47 @@ export function usePartyBalanceTotals() {
     },
   });
 }
+
+/**
+ * Global per-party balances, returned as aggregates only. Individual ledger
+ * rows remain protected by the wallet access policies.
+ */
+export function usePartyBalanceSummary() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['dashboard', 'party-balance-summary', user?.id],
+    enabled: !!user?.id,
+    queryFn: async (): Promise<PartySummary[]> => {
+      const { data, error } = await (supabase as any)
+        .rpc('walletmanager_party_balance_summary');
+
+      if (error) throw error;
+
+      return (data || []).map((row: {
+        party_id: string;
+        party_name: string;
+        receivable: number | string;
+        payable: number | string;
+        net: number | string;
+        entry_count: number | string;
+        latest_entry_date: string | null;
+      }): PartySummary => {
+        const net = Number(row.net) || 0;
+        return {
+          id: row.party_id,
+          party_name: row.party_name,
+          phone: null,
+          receivable: Number(row.receivable) || 0,
+          payable: Number(row.payable) || 0,
+          receivableUsd: 0,
+          payableUsd: 0,
+          net,
+          unsettled_count: Number(row.entry_count) || 0,
+          latestEntryDate: row.latest_entry_date,
+          status: net > 0 ? 'RECEIVABLE' : net < 0 ? 'PAYABLE' : 'SETTLED',
+        };
+      });
+    },
+  });
+}

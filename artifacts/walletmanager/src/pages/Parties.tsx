@@ -33,7 +33,7 @@ import {
   useUpdateParty, 
   useDeleteParty 
 } from '@/hooks/useParties';
-import { usePartySummary } from '@/hooks/useDashboard';
+import { usePartyBalanceSummary } from '@/hooks/useDashboard';
 import { formatNPR } from '@/lib/format';
 import { Party } from '@/lib/types';
 import { useAuth } from '@/hooks/useAuth';
@@ -55,7 +55,7 @@ export default function Parties() {
   const isAdmin = user && role === "ADMIN";
 
   const { data: parties, isLoading } = useParties();
-  const { data: partySummary, error: partySummaryError } = usePartySummary();
+  const { data: partySummary, error: partySummaryError } = usePartyBalanceSummary();
   
   const createParty = useCreateParty();
   const updateParty = useUpdateParty();
@@ -173,7 +173,7 @@ export default function Parties() {
       {partySummaryError && (
         <Alert variant="destructive" className="mb-4">
           <AlertTitle>Party balances unavailable</AlertTitle>
-          <AlertDescription>Wallet access could not be verified. Check the account-access migration, then reload.</AlertDescription>
+          <AlertDescription>Per-party balance summaries could not be loaded. Check that the party-summary migration has been applied.</AlertDescription>
         </Alert>
       )}
 

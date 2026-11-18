@@ -19,7 +19,7 @@ import type { SelectOption } from '@/components/ui/SearchableSelect';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { useDashboardStats, useEmailPerformance, usePartyBalanceTotals, usePartySummary, useEmailsWithNoActivity } from '@/hooks/useDashboard';
+import { useDashboardStats, useEmailPerformance, usePartyBalanceSummary, usePartyBalanceTotals, usePartySummary, useEmailsWithNoActivity } from '@/hooks/useDashboard';
 import { useProfitMetrics, useTotalWalletBalance, getDateRange, DateFilterType, DateFilter } from '@/hooks/useProfitMetrics';
 import { useSettleAllParty } from '@/hooks/usePartyTransactions';
 import { useNepaliAccounts, useTotalNprBalance } from '@/hooks/useNepaliAccounts';
@@ -60,7 +60,8 @@ export default function Dashboard() {
   const { isAdmin, isEditor } = useUserRole();
   const { isVisible: showSensitive, MASK } = useSensitiveDataVisibility();
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
-  const { data: partySummary, isLoading: partyLoading, error: partyError } = usePartySummary();
+  const { data: scopedPartySummary, error: partyScopeError } = usePartySummary();
+  const { data: partySummary, isLoading: partyLoading, error: partySummaryError } = usePartyBalanceSummary();
   const { data: partyTotals, error: partyTotalsError } = usePartyBalanceTotals();
   const settleAll = useSettleAllParty();
   const { totalBalance: totalNprBalance, isLoading: nprBalanceLoading } = useTotalNprBalance();
@@ -218,12 +219,12 @@ export default function Dashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          {(partyError || partyTotalsError) && (
+          {(partyScopeError || partySummaryError || partyTotalsError) && (
             <Alert variant="destructive" className="mb-4">
               <AlertTitle>Some party balance data is unavailable</AlertTitle>
               <AlertDescription>
-                {partyError && 'Party-by-party balances and transactions require the account-access migration and are limited to assigned NPR wallets. '}
-                {partyTotalsError && 'Global totals require the party-summary migration.'}
+                {partyScopeError && 'Wallet-scoped transactions and settlement balances require the account-access migration. '}
+                {(partySummaryError || partyTotalsError) && 'Global party balances require the party-summary migration.'}
               </AlertDescription>
             </Alert>
           )}
@@ -234,7 +235,7 @@ export default function Dashboard() {
           </div>
           <div className="table-container max-h-[300px]">
             <Table><TableHeader className="table-sticky-header"><TableRow><TableHead>Party Name</TableHead><TableHead className="text-right">Receivable (NPR)</TableHead><TableHead className="text-right">Payable (NPR)</TableHead><TableHead className="text-center">Entries</TableHead><TableHead>Status</TableHead><TableHead className="w-[120px]">Actions</TableHead></TableRow></TableHeader>
-              <TableBody>{partyLoading ? [...Array(3)].map((_, i) => (<TableRow key={i}>{[...Array(6)].map((_, j) => (<TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>))}</TableRow>)) : filteredPartySummary?.length === 0 ? (<TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">{hideZeroBalance ? 'No parties with outstanding balances' : 'No party data yet'}</TableCell></TableRow>) : filteredPartySummary?.slice(0, 10).map((party) => (<TableRow key={party.id}><TableCell className="font-medium">{party.party_name}</TableCell><TableCell className="text-right currency-positive">{formatNPR(party.receivable)}</TableCell><TableCell className="text-right currency-negative">{formatNPR(party.payable)}</TableCell><TableCell className="text-center"><span className="text-muted-foreground">{party.unsettled_count}</span></TableCell><TableCell><StatusBadge variant={party.status === 'RECEIVABLE' ? 'receivable' : party.status === 'PAYABLE' ? 'payable' : 'settled'}>{party.status === 'RECEIVABLE' ? 'लिनुपर्ने' : party.status === 'PAYABLE' ? 'दिनुपर्ने' : 'सेटल भयो'}</StatusBadge></TableCell><TableCell><div className="flex gap-1"><Button variant="ghost" size="icon" onClick={() => setViewLedger(party)} title="View Ledger"><Eye className="h-4 w-4" /></Button>{(party.receivable > 0 || party.payable > 0) && (<Button variant="ghost" size="icon" onClick={() => setSettlingParty(party)} title="Settle All"><Check className="h-4 w-4 text-success" /></Button>)}</div></TableCell></TableRow>))}</TableBody>
+              <TableBody>{partyLoading ? [...Array(3)].map((_, i) => (<TableRow key={i}>{[...Array(6)].map((_, j) => (<TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>))}</TableRow>)) : partySummaryError ? (<TableRow><TableCell colSpan={6} className="py-8 text-center text-destructive">Party balances unavailable</TableCell></TableRow>) : filteredPartySummary?.length === 0 ? (<TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">{hideZeroBalance ? 'No parties with outstanding balances' : 'No party data yet'}</TableCell></TableRow>) : filteredPartySummary?.slice(0, 10).map((party) => (<TableRow key={party.id}><TableCell className="font-medium">{party.party_name}</TableCell><TableCell className="text-right currency-positive">{formatNPR(party.receivable)}</TableCell><TableCell className="text-right currency-negative">{formatNPR(party.payable)}</TableCell><TableCell className="text-center"><span className="text-muted-foreground">{party.unsettled_count}</span></TableCell><TableCell><StatusBadge variant={party.status === 'RECEIVABLE' ? 'receivable' : party.status === 'PAYABLE' ? 'payable' : 'settled'}>{party.status === 'RECEIVABLE' ? 'लिनुपर्ने' : party.status === 'PAYABLE' ? 'दिनुपर्ने' : 'सेटल भयो'}</StatusBadge></TableCell><TableCell><div className="flex gap-1"><Button variant="ghost" size="icon" onClick={() => setViewLedger(party)} title="View accessible ledger"><Eye className="h-4 w-4" /></Button>{scopedPartySummary?.some((scoped) => scoped.id === party.id && (scoped.receivable > 0 || scoped.payable > 0)) && (<Button variant="ghost" size="icon" onClick={() => { const scoped = scopedPartySummary.find((item) => item.id === party.id); if (scoped) setSettlingParty(scoped); }} title="Settle accessible balance"><Check className="h-4 w-4 text-success" /></Button>)}</div></TableCell></TableRow>))}</TableBody>
             </Table>
           </div>
         </CardContent>
