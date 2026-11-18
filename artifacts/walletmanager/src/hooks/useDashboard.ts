@@ -528,3 +528,28 @@ export function usePartySummary() {
     isLoading: scopeLoading || summaryQuery.isLoading,
   };
 }
+
+/**
+ * All-time receivable/payable totals across the full party ledger.
+ * The database function returns only the aggregate, never individual rows.
+ */
+export function usePartyBalanceTotals() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['dashboard', 'party-balance-totals', user?.id],
+    enabled: !!user?.id,
+    queryFn: async (): Promise<{ receivable: number; payable: number }> => {
+      const { data, error } = await (supabase as any)
+        .rpc('walletmanager_party_balance_totals');
+
+      if (error) throw error;
+
+      const row = Array.isArray(data) ? data[0] : data;
+      return {
+        receivable: Number(row?.receivable) || 0,
+        payable: Number(row?.payable) || 0,
+      };
+    },
+  });
+}

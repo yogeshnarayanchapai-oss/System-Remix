@@ -20,7 +20,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usePartySummary } from '@/hooks/useDashboard';
+import { usePartyBalanceTotals, usePartySummary } from '@/hooks/useDashboard';
 import { formatNPR } from '@/lib/format';
 import { PartySummary } from '@/lib/types';
 import { PartyLedgerModal } from '@/components/party/PartyLedgerModal';
@@ -34,6 +34,7 @@ export default function ReceivablePayable() {
   const [activeTab, setActiveTab] = useState('summary');
 
   const { data: partySummary, isLoading, error: partyError } = usePartySummary();
+  const { data: partyTotals, error: partyTotalsError } = usePartyBalanceTotals();
 
   // Filter parties
   const filteredParties = partySummary?.filter(p => {
@@ -45,12 +46,8 @@ export default function ReceivablePayable() {
     return true;
   });
 
-  // Calculate totals (NPR - receivable/payable already calculated in hook)
-  const totals = partySummary?.reduce((acc, party) => {
-    acc.receivable += party.receivable;
-    acc.payable += party.payable;
-    return acc;
-  }, { receivable: 0, payable: 0 }) || { receivable: 0, payable: 0 };
+  // Global aggregate totals remain visible; party-level rows stay wallet-scoped.
+  const totals = partyTotals || { receivable: 0, payable: 0 };
 
   // Nepali labels for this page only
   const labels = {
@@ -70,10 +67,13 @@ export default function ReceivablePayable() {
         title="Receivable / Payable" 
         description="Track what you owe and what's owed to you (NPR = USD × Rate)"
       />
-      {partyError && (
+      {(partyError || partyTotalsError) && (
         <Alert variant="destructive" className="mb-4">
-          <AlertTitle>Party balances unavailable</AlertTitle>
-          <AlertDescription>Wallet access could not be verified. Check the account-access migration, then reload.</AlertDescription>
+          <AlertTitle>Some party balance data is unavailable</AlertTitle>
+          <AlertDescription>
+            {partyError && 'Party details and transactions require the account-access migration and only include assigned NPR wallets. '}
+            {partyTotalsError && 'Global receivable/payable totals require the party-summary migration.'}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -81,20 +81,20 @@ export default function ReceivablePayable() {
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           title={`${labels.receivable} (NPR)`}
-          value={partyError ? 'Unavailable' : formatNPR(totals.receivable)}
+          value={partyTotalsError ? 'Unavailable' : formatNPR(totals.receivable)}
           subtitle="Sum of OUTGOING (unsettled)"
           icon={<ArrowUpRight className="h-5 w-5 text-receivable" />}
         />
         <StatCard
           title={`${labels.payable} (NPR)`}
-          value={partyError ? 'Unavailable' : formatNPR(totals.payable)}
+          value={partyTotalsError ? 'Unavailable' : formatNPR(totals.payable)}
           subtitle="Sum of INCOMING (unsettled)"
           icon={<ArrowDownLeft className="h-5 w-5 text-payable" />}
         />
         <StatCard
           title="Net Position (NPR)"
-          value={partyError ? 'Unavailable' : formatNPR(totals.receivable - totals.payable)}
-          subtitle={partyError ? 'Wallet access unavailable' : totals.receivable > totals.payable ? labels.receivable : totals.receivable < totals.payable ? labels.payable : 'Balanced'}
+          value={partyTotalsError ? 'Unavailable' : formatNPR(totals.receivable - totals.payable)}
+          subtitle={partyTotalsError ? 'Global total unavailable' : totals.receivable > totals.payable ? labels.receivable : totals.receivable < totals.payable ? labels.payable : 'Balanced'}
           variant="primary"
           icon={<Scale className="h-5 w-5 text-primary-foreground" />}
         />

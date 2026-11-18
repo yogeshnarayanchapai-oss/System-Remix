@@ -19,7 +19,7 @@ import type { SelectOption } from '@/components/ui/SearchableSelect';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { useDashboardStats, useEmailPerformance, usePartySummary, useEmailsWithNoActivity } from '@/hooks/useDashboard';
+import { useDashboardStats, useEmailPerformance, usePartyBalanceTotals, usePartySummary, useEmailsWithNoActivity } from '@/hooks/useDashboard';
 import { useProfitMetrics, useTotalWalletBalance, getDateRange, DateFilterType, DateFilter } from '@/hooks/useProfitMetrics';
 import { useSettleAllParty } from '@/hooks/usePartyTransactions';
 import { useNepaliAccounts, useTotalNprBalance } from '@/hooks/useNepaliAccounts';
@@ -61,6 +61,7 @@ export default function Dashboard() {
   const { isVisible: showSensitive, MASK } = useSensitiveDataVisibility();
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
   const { data: partySummary, isLoading: partyLoading, error: partyError } = usePartySummary();
+  const { data: partyTotals, error: partyTotalsError } = usePartyBalanceTotals();
   const settleAll = useSettleAllParty();
   const { totalBalance: totalNprBalance, isLoading: nprBalanceLoading } = useTotalNprBalance();
   const { data: usdAccounts, isLoading: usdAccountsLoading } = usePaypalAccounts();
@@ -142,7 +143,7 @@ export default function Dashboard() {
       return b.unsettled_count - a.unsettled_count;
     }
   });
-  const partyTotals = partySummary?.reduce((acc, p) => { acc.receivable += p.receivable; acc.payable += p.payable; return acc; }, { receivable: 0, payable: 0 }) || { receivable: 0, payable: 0 };
+  const displayPartyTotals = partyTotals || { receivable: 0, payable: 0 };
 
   const handleSettleAll = async () => {
     if (!settlingParty) return;
@@ -217,16 +218,19 @@ export default function Dashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          {partyError && (
+          {(partyError || partyTotalsError) && (
             <Alert variant="destructive" className="mb-4">
-              <AlertTitle>Party balances unavailable</AlertTitle>
-              <AlertDescription>Wallet access could not be verified. Check the account-access migration, then reload.</AlertDescription>
+              <AlertTitle>Some party balance data is unavailable</AlertTitle>
+              <AlertDescription>
+                {partyError && 'Party-by-party balances and transactions require the account-access migration and are limited to assigned NPR wallets. '}
+                {partyTotalsError && 'Global totals require the party-summary migration.'}
+              </AlertDescription>
             </Alert>
           )}
           <div className="mb-4 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-lg bg-success/10 p-3 text-center"><p className="text-xs text-muted-foreground">Total Receivable (लिनुपर्ने)</p><p className="text-base font-bold text-success sm:text-lg" title={partyError ? 'Unavailable' : `${formatNPR(partyTotals.receivable)} NPR`} aria-label={partyError ? 'Receivables unavailable' : `Total receivable ${formatNPR(partyTotals.receivable)} NPR`}>{partyError ? 'Unavailable' : formatCompactNPR(partyTotals.receivable)}</p></div>
-            <div className="rounded-lg bg-payable/10 p-3 text-center"><p className="text-xs text-muted-foreground">Total Payable (दिनुपर्ने)</p><p className="text-base font-bold text-payable sm:text-lg" title={partyError ? 'Unavailable' : `${formatNPR(partyTotals.payable)} NPR`} aria-label={partyError ? 'Payables unavailable' : `Total payable ${formatNPR(partyTotals.payable)} NPR`}>{partyError ? 'Unavailable' : formatCompactNPR(partyTotals.payable)}</p></div>
-            <div className="rounded-lg bg-primary/10 p-3 text-center"><p className="text-xs text-muted-foreground">Net Position</p><p className="text-base font-bold text-primary sm:text-lg" title={partyError ? 'Unavailable' : `${formatNPR(partyTotals.receivable - partyTotals.payable)} NPR`} aria-label={partyError ? 'Net position unavailable' : `Net position ${formatNPR(partyTotals.receivable - partyTotals.payable)} NPR`}>{partyError ? 'Unavailable' : formatCompactNPR(partyTotals.receivable - partyTotals.payable)}</p></div>
+            <div className="rounded-lg bg-success/10 p-3 text-center"><p className="text-xs text-muted-foreground">Total Receivable (लिनुपर्ने)</p><p className="text-base font-bold text-success sm:text-lg" title={partyTotalsError ? 'Unavailable' : `${formatNPR(displayPartyTotals.receivable)} NPR`} aria-label={partyTotalsError ? 'Receivables unavailable' : `Total receivable ${formatNPR(displayPartyTotals.receivable)} NPR`}>{partyTotalsError ? 'Unavailable' : formatCompactNPR(displayPartyTotals.receivable)}</p></div>
+            <div className="rounded-lg bg-payable/10 p-3 text-center"><p className="text-xs text-muted-foreground">Total Payable (दिनुपर्ने)</p><p className="text-base font-bold text-payable sm:text-lg" title={partyTotalsError ? 'Unavailable' : `${formatNPR(displayPartyTotals.payable)} NPR`} aria-label={partyTotalsError ? 'Payables unavailable' : `Total payable ${formatNPR(displayPartyTotals.payable)} NPR`}>{partyTotalsError ? 'Unavailable' : formatCompactNPR(displayPartyTotals.payable)}</p></div>
+            <div className="rounded-lg bg-primary/10 p-3 text-center"><p className="text-xs text-muted-foreground">Net Position</p><p className="text-base font-bold text-primary sm:text-lg" title={partyTotalsError ? 'Unavailable' : `${formatNPR(displayPartyTotals.receivable - displayPartyTotals.payable)} NPR`} aria-label={partyTotalsError ? 'Net position unavailable' : `Net position ${formatNPR(displayPartyTotals.receivable - displayPartyTotals.payable)} NPR`}>{partyTotalsError ? 'Unavailable' : formatCompactNPR(displayPartyTotals.receivable - displayPartyTotals.payable)}</p></div>
           </div>
           <div className="table-container max-h-[300px]">
             <Table><TableHeader className="table-sticky-header"><TableRow><TableHead>Party Name</TableHead><TableHead className="text-right">Receivable (NPR)</TableHead><TableHead className="text-right">Payable (NPR)</TableHead><TableHead className="text-center">Entries</TableHead><TableHead>Status</TableHead><TableHead className="w-[120px]">Actions</TableHead></TableRow></TableHeader>
